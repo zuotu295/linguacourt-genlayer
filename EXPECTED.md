@@ -73,7 +73,13 @@ entitlement and no withdraw path. The first v2 deployment
 `0xc5342923102ab50832660c0a517bef2217256caa98fd80d2d51529ef6f4c47a1`)
 was abandoned for this reason: two failed `create_case` calls (1 GEN
 wrong-fee, 10 GEN translator-is-client) stranded 11 GEN there, and the
-contract balance could never return to 0. It holds 1 OPEN case and
-11 GEN; it is not the live contract and none of its txs are v2
-evidence. Evidence design rule going forward: never send value on an
+contract balance could never return to 0. Correction 2026-11-11 (live
+readback, after the evidence run): the abandoned contract holds 21 GEN
+in total — the 11 GEN from the two failed payables plus the 10 GEN
+escrow of its one SUBMITTED case, whose keys are lost (contract balance
+21 GEN, escrowed 10 GEN, both credits 0, nothing withdrawn). It holds 1
+SUBMITTED case and 21 GEN; it is not the live contract and none of its
+txs are v2 evidence. The pre-registered evidence expectations above
+(cases, negatives, accounting) are unchanged by this correction.
+Evidence design rule going forward: never send value on an
 expected-failure payable call.

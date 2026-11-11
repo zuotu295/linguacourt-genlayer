@@ -102,7 +102,7 @@ Network: Stable Studionet (Chain ID 61999). Protocol `linguacourt-2`. All transa
 - Escrowed: 0 GEN
 - Accounting: 60 GEN in = 60 GEN out, no unexplained gap.
 
-## Negative calls (all FINALIZED + leader ERROR, no state change)
+## Negative calls (10 on-chain negatives, neg0–neg9; all FINALIZED + MAJORITY_AGREE + leader ERROR, no state change)
 
 - neg0 wrong-fee-create: FEE_MUST_BE_10_GEN (value 0, so nothing stranded)
 - neg1 client-submits-own: CLIENT_CANNOT_TRANSLATE_OWN_CASE
@@ -119,7 +119,7 @@ TRANSLATOR_MUST_DIFFER (create with translator == client) is covered by mock tes
 
 ## Abandoned first v2 deployment (not evidence)
 
-- First v2 deployment `0x634667fEB842d7AA61c6c8cE3cC37b41D6432EBF` (deploy tx `0xc5342923102ab50832660c0a517bef2217256caa98fd80d2d51529ef6f4c47a1`) was abandoned after two failed `create_case` calls stranded 11 GEN there (failed payable calls keep their value on Studionet). It holds 1 OPEN case and 11 GEN; none of its txs are v2 evidence. The live v2 contract is `0x3F256137ACA7f2170Eb14F034feA1d4e5885c614`.
+- First v2 deployment `0x634667fEB842d7AA61c6c8cE3cC37b41D6432EBF` (deploy tx `0xc5342923102ab50832660c0a517bef2217256caa98fd80d2d51529ef6f4c47a1`) was abandoned after two failed `create_case` calls (1 GEN wrong-fee, 10 GEN translator-is-client) stranded 11 GEN there (failed payable calls keep their value on Studionet), and one successfully created case holds a further 10 GEN escrow with no exit — 21 GEN permanently locked in total (live readback 2026-11-11: contract balance 21 GEN, escrowed 10 GEN, 1 case SUBMITTED, both credits 0, nothing withdrawn). It holds 1 SUBMITTED case and 21 GEN; none of its txs are v2 evidence. The live v2 contract is `0x3F256137ACA7f2170Eb14F034feA1d4e5885c614`.
 
 ## v1 evidence
 

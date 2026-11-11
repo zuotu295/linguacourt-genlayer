@@ -9,11 +9,11 @@ import {
   fmtReadbackTime, walletKind, shortAddr, gen, type CaseRec, type Totals, type Wallet,
 } from './chain';
 import { t, type Lang } from './i18n';
+import { cpLen, validateCreate, validateTranslation, sourceError, briefError, translatorError, translationError } from './validate';
 
 interface TxTrack { label: string; hash: string; stage: 'sent' | 'finalized-ok' | 'failed' | 'unknown'; receipt?: any; error?: string }
 
 const VERDICT_CLASS: Record<string, string> = { ACCEPT: 'v-accept', PARTIAL: 'v-partial', REJECT: 'v-reject' };
-const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 export default function App() {
   const [lang, setLang] = useState<Lang>('zh');
@@ -99,6 +99,18 @@ export default function App() {
   }, [wallet]);
 
   const sel = useMemo(() => cases.find((c) => c.case_id === selected) || null, [cases, selected]);
+
+  // Live validation state for the create form and the translation form.
+  // Counts are code points (matching the contract's Python len()).
+  // Inline errors show only once a field has content, so a fresh empty
+  // form is not noisy. Buttons stay disabled while invalid; the handler
+  // checks in onCreate / onSubmitTr are the real gate, not the buttons.
+  const createErr = validateCreate({ source: src, target, brief, translator: translatorAddr, client: wallet?.address || '' });
+  const srcErr = src.length > 0 ? sourceError(src) : null;
+  const briefErr = brief.length > 0 ? briefError(brief) : null;
+  const translatorErr = translatorAddr.trim().length > 0 ? translatorError(translatorAddr, wallet?.address || '') : null;
+  const trErr = validateTranslation(trText);
+  const trFieldErr = trText.length > 0 ? translationError(trText) : null;
 
   function tempExposure(addr: string): string[] {
     const lines: string[] = [];
@@ -254,14 +266,17 @@ export default function App() {
     e.preventDefault();
     if (!wallet) { setNotice(t('notConnected', lang)); return; }
     if (wallet.mode === 'temporary') { setNotice(t('tempBlockedCreate', lang)); return; }
-    if (src.trim().length < 20) { setNotice('Source text must be 20–2000 characters. / 原文需 20–2000 字。'); return; }
-    if (!ADDR_RE.test(translatorAddr.trim())) { setNotice('Designated translator address must be a 0x 42-char hex address. / 指定译者地址必须是 0x 开头的 42 位十六进制地址。'); return; }
-    if (translatorAddr.trim().toLowerCase() === wallet.address.toLowerCase()) { setNotice('Translator must differ from the client. / 译者不能是客户本人。'); return; }
+    // Full contract-bounds gate BEFORE the payable send: a failed payable
+    // call strands its 10 GEN on Studionet (no refund). Never rely on
+    // maxLength alone — it counts UTF-16 units, not code points.
+    const err = validateCreate({ source: src, target, brief, translator: translatorAddr, client: wallet.address });
+    if (err) { setNotice(err); return; }
     const r = await doWrite(t('createTitle', lang), 'create_case', [src.trim(), target, brief.trim(), translatorAddr.trim().toLowerCase()], FEE_WEI, '10 GEN escrow');
     if (r) { setSrc(''); setBrief(''); setTranslatorAddr(''); }
   }
   async function onSubmitTr(c: CaseRec) {
-    if (trText.trim().length < 10) { setNotice('Translation must be 10–2000 characters. / 译文需 10–2000 字。'); return; }
+    const err = validateTranslation(trText);
+    if (err) { setNotice(err); return; }
     const r = await doWrite(t('submitTr', lang), 'submit_translation', [c.case_id, trText.trim()], 0n, `Case #${c.case_id}`);
     if (r) setTrText('');
   }
@@ -401,8 +416,10 @@ export default function App() {
             <h2>{t('createTitle', lang)}</h2>
             <form onSubmit={onCreate}>
               <label>{t('sourceLabel', lang)}
-                <textarea value={src} onChange={(e) => setSrc(e.target.value)} placeholder={t('sourcePh', lang)} rows={4} required />
+                <textarea value={src} onChange={(e) => setSrc(e.target.value)} placeholder={t('sourcePh', lang)} rows={4} maxLength={2000} required />
               </label>
+              <p className="count">{cpLen(src.trim())} / 2000</p>
+              {srcErr && <p className="field-error">{srcErr}</p>}
               <div className="row">
                 <label>{t('targetLabel', lang)}
                   <select value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -413,12 +430,15 @@ export default function App() {
                   <input value={brief} onChange={(e) => setBrief(e.target.value)} placeholder={t('briefPh', lang)} maxLength={500} />
                 </label>
               </div>
+              <p className="count">{cpLen(brief)} / 500</p>
+              {briefErr && <p className="field-error">{briefErr}</p>}
               <label>{t('translatorLabel', lang)}
                 <input value={translatorAddr} onChange={(e) => setTranslatorAddr(e.target.value)} placeholder={t('translatorPh', lang)} maxLength={42} required />
               </label>
+              {translatorErr && <p className="field-error">{translatorErr}</p>}
               <p className="fee-note">{t('feeNote', lang)}</p>
               {wallet?.mode === 'temporary' && <p className="notice">{t('tempBlockedCreate', lang)}</p>}
-              <button className="btn primary" type="submit" disabled={!!busy || !wallet}>{busy ? '⏳ …' : t('createBtn', lang)}</button>
+              <button className="btn primary" type="submit" disabled={!!busy || !wallet || createErr !== null}>{busy ? '⏳ …' : t('createBtn', lang)}</button>
               {!wallet && <p className="hint">{t('notConnected', lang)}</p>}
             </form>
           </section>
@@ -460,8 +480,10 @@ export default function App() {
                 </dl>
                 {sel.status === 'OPEN' && (
                   <div className="actions">
-                    <textarea value={trText} onChange={(e) => setTrText(e.target.value)} placeholder={t('translationPh', lang)} rows={3} />
-                    <button className="btn primary" onClick={() => onSubmitTr(sel)} disabled={!!busy || !wallet}>{t('submitTr', lang)}</button>
+                    <textarea value={trText} onChange={(e) => setTrText(e.target.value)} placeholder={t('translationPh', lang)} rows={3} maxLength={2000} />
+                    <p className="count">{cpLen(trText.trim())} / 2000</p>
+                    {trFieldErr && <p className="field-error">{trFieldErr}</p>}
+                    <button className="btn primary" onClick={() => onSubmitTr(sel)} disabled={!!busy || !wallet || trErr !== null}>{t('submitTr', lang)}</button>
                     {me && me === sel.client && <p className="hint">The client cannot translate their own case. / 客户不能翻译自己的案件。</p>}
                     {me && me !== sel.translator && me !== sel.client && <p className="hint">Only the designated translator ({shortAddr(sel.translator)}) can submit. / 只有指定译者可以提交译文。</p>}
                     {me && me === sel.client && (

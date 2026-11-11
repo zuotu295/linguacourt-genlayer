@@ -2,6 +2,10 @@
 // Re-reads everything live from Studionet and compares against
 // evidence/transactions.json and EXPECTED.md. No wallet, no
 // transactions, no writes.
+// For error-observed steps it requires ALL of: FINALIZED,
+// MAJORITY_AGREE, leader execution_result ERROR, and the live leader
+// payload exactly equal to the step's recorded expected payload — a
+// MAJORITY_DISAGREE or a wrong error code fails the check.
 // Usage: node scripts/verify_evidence.mjs
 import fs from 'node:fs';
 import path from 'node:path';
@@ -65,9 +69,18 @@ for (const s of ev.steps) {
       [7, 'FINALIZED'].includes(tx.status) && [6, 'MAJORITY_AGREE'].includes(tx.result)
       && leaderRec(tx)?.execution_result === 'SUCCESS', s.hash.slice(0, 18));
   } else if (s.outcome === 'error-observed') {
-    check(`${s.label} FINALIZED + leader ERROR`,
-      [7, 'FINALIZED'].includes(tx.status) && leaderRec(tx)?.execution_result === 'ERROR',
-      s.hash.slice(0, 18) + ' payload=' + leaderPayload(tx).slice(0, 80));
+    // A negative only passes when consensus AGREES the call errors with
+    // exactly the expected code: FINALIZED + MAJORITY_AGREE + leader
+    // ERROR + live payload === the payload recorded in
+    // evidence/transactions.json. A MAJORITY_DISAGREE (consensus itself
+    // split) or a wrong error code FAILS — it must never count as a pass.
+    const livePayload = leaderPayload(tx);
+    const expectedPayload = typeof s.payload === 'string' ? s.payload : '';
+    check(`${s.label} FINALIZED + MAJORITY_AGREE + leader ERROR + payload ${expectedPayload || '(no expected payload recorded)'}`,
+      [7, 'FINALIZED'].includes(tx.status) && [6, 'MAJORITY_AGREE'].includes(tx.result)
+      && leaderRec(tx)?.execution_result === 'ERROR'
+      && expectedPayload.length > 0 && livePayload === expectedPayload,
+      s.hash.slice(0, 18) + ' payload=' + livePayload.slice(0, 80));
   } else {
     check(`${s.label} recorded outcome ${s.outcome} re-read FINALIZED`,
       [7, 'FINALIZED'].includes(tx.status), s.hash.slice(0, 18));

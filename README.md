@@ -54,7 +54,7 @@ npm run preview
 ```bash
 npm test            # contract mock tests (20 cases)
 node scripts/deploy_studionet.mjs    # deploy + byte-parity check
-node scripts/run_evidence.mjs        # full evidence run (6 cases + 11 negatives; resumable)
+node scripts/run_evidence.mjs        # full evidence run (6 cases + 10 on-chain negatives neg0–neg9; resumable)
 node scripts/verify_evidence.mjs     # independent re-verification, read-only
 ```
 
@@ -75,4 +75,4 @@ Evidence transactions: `evidence/transactions.json` (see `EVIDENCE.md`).
 - No time gates: every transition is an explicit action; a case stays OPEN until its designated translator submits, and stays SUBMITTED until the client acts or the translator escalates.
 - One translation per case; the client cannot request revisions — a new case is needed for a revised translation.
 - v1 (`linguacourt-1`, contract `0xE3F85C032a4B9eEc2978aEf39885Bf5374291C5D`) is superseded; its evidence is archived under `evidence/v1/` and must not be presented as v2 evidence.
-- Platform behavior (verified live 2026-11-11): on Studionet a FAILED payable call does not refund the sent value — it stays in the contract with no entitlement. The first v2 deployment (`0x634667fEB842d7AA61c6c8cE3cC37b41D6432EBF`) was abandoned after two failed `create_case` calls stranded 11 GEN there; evidence never sends value on an expected-failure payable call.
+- Platform behavior (verified live 2026-11-11): on Studionet a FAILED payable call does not refund the sent value — it stays in the contract with no entitlement. The first v2 deployment (`0x634667fEB842d7AA61c6c8cE3cC37b41D6432EBF`) was abandoned after two failed `create_case` calls (1 GEN wrong-fee, 10 GEN translator-is-client) stranded 11 GEN there, and one successfully created case (SUBMITTED, keys lost) holds a further 10 GEN escrow with no exit — 21 GEN permanently locked in total (live readback 2026-11-11: contract balance 21 GEN, escrowed 10 GEN, 1 SUBMITTED case, both credits 0, nothing withdrawn). Evidence never sends value on an expected-failure payable call. The frontend validates every `create_case` / `submit_translation` input against the contract bounds (code-point counts) before any payable send, so an over-long source text can no longer strand the 10 GEN fee.

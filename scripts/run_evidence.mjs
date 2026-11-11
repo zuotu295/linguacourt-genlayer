@@ -1,8 +1,10 @@
 // LinguaCourt v2 evidence run on Stable Studionet (61999).
 // Pre-registered expectations: EXPECTED.md (written before this run).
 // 6 cases (ACCEPT / PARTIAL / REJECT / CANCEL / ESCALATE-ACCEPT /
-// INJECTION-REJECT) + 11 negative calls that must fail on-chain as
-// contract_error with no state change. Every tx is waited to FINALIZED
+// INJECTION-REJECT) + 10 on-chain negative calls that must fail on-chain
+// as contract_error with no state change (TRANSLATOR_MUST_DIFFER is an
+// 11th negative covered by mock tests only — it would strand 10 GEN
+// on-chain, so it is never sent). Every tx is waited to FINALIZED
 // and checked; GEN accounting is verified exact at the end (60 GEN in =
 // 60 GEN out, escrow 0). Disputes/escalations retry (max 3) only when
 // consensus itself disagrees (MAJORITY_DISAGREE, state unchanged); a
