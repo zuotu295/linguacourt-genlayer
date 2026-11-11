@@ -32,6 +32,7 @@ export default function App() {
   const [keyModal, setKeyModal] = useState(false);
   const [keyAcked, setKeyAcked] = useState(false);
   const [keyCopied, setKeyCopied] = useState(false);
+  const [keyRevealed, setKeyRevealed] = useState(false);
 
   const [src, setSrc] = useState('');
   const [target, setTarget] = useState('Spanish');
@@ -203,6 +204,8 @@ export default function App() {
       const w = await temporaryAccount();
       setWallet(w);
       setKeyAcked(isTempKeyAcked());
+      setKeyCopied(false);
+      setKeyRevealed(false);
       if (!isTempKeyAcked()) setKeyModal(true);
     } catch (e: any) { setNotice('Temporary account failed: ' + (e?.message || String(e))); }
     finally { setWalletBusy(false); }
@@ -214,6 +217,8 @@ export default function App() {
       const w = await rotateTemporaryAccount();
       setWallet(w);
       setKeyAcked(false);
+      setKeyCopied(false);
+      setKeyRevealed(false);
       setKeyModal(true);
     } catch (e: any) { setNotice(String(e?.message || e)); }
     finally { setWalletBusy(false); }
@@ -284,6 +289,17 @@ export default function App() {
   const canAct = (c: CaseRec) => me && c.status === 'SUBMITTED' && c.client === me;
   const isTranslator = (c: CaseRec) => me && c.translator === me;
 
+  // This temp address's actual exposure, computed from the on-chain docket:
+  // unsettled cases it is a party to + withdrawable credits. A fresh temp
+  // address has none (temp accounts cannot create cases / escrow funds).
+  const myCases = wallet?.mode === 'temporary' ? cases.filter((c) => c.client === me || c.translator === me) : [];
+  const unsettledCount = myCases.filter((c) => c.status === 'OPEN' || c.status === 'SUBMITTED').length;
+  const withdrawableGen = myCases.reduce((s, c) => s
+    + (c.translator === me && c.translator_credit > 0 && !c.translator_withdrawn ? Number(gen(c.translator_credit)) : 0)
+    + (c.client === me && c.client_credit > 0 && !c.client_withdrawn ? Number(gen(c.client_credit)) : 0), 0);
+  const tempKey = tempPrivateKey();
+  const maskedKey = !tempKey ? '—' : keyRevealed ? tempKey : tempKey.slice(0, 6) + '…' + tempKey.slice(-4);
+
   return (
     <div className="page">
       <header className="topbar">
@@ -320,8 +336,13 @@ export default function App() {
             <h3>{t('keyModalTitle', lang)}</h3>
             <p>{t('keyModalBody', lang)}</p>
             <p className="mono small">Temp address: {wallet.address}</p>
-            <p className="mono key-line">{tempPrivateKey() || '—'}</p>
+            <p className="key-exposure">{unsettledCount === 0 && withdrawableGen === 0
+              ? t('keyExposureNone', lang)
+              : t('keyExposure', lang).replace('{n}', String(unsettledCount)).replace('{x}', String(withdrawableGen))}</p>
+            <p className="mono key-line">{maskedKey}</p>
+            <p className="key-mask-note">{t('keyMaskNote', lang)}</p>
             <div className="actions">
+              <button className="btn" onClick={() => setKeyRevealed(!keyRevealed)}>{keyRevealed ? t('keyHideFull', lang) : t('keyShowFull', lang)}</button>
               <button className="btn" onClick={copyTempKey}>{t('keyCopy', lang)}{keyCopied ? ' ✓' : ''}</button>
               <button className="btn" onClick={exportTempKey}>{t('keyExport', lang)}</button>
             </div>
@@ -329,6 +350,7 @@ export default function App() {
               <input type="checkbox" checked={keyAcked} onChange={(e) => setKeyAcked(e.target.checked)} /> {t('keyAck', lang)}
             </label>
             <button className="btn primary" onClick={confirmKeySaved} disabled={!keyAcked}>{t('keySaved', lang)}</button>
+            <button className="btn ghost" onClick={() => setKeyModal(false)}>{t('keyLater', lang)}</button>
           </div>
         </div>
       )}
