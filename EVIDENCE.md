@@ -139,6 +139,16 @@ GitHub Pages site, using in-browser temporary test accounts:
 
 All three browser txs were re-read live from their receipts (method + sender + FINALIZED + MAJORITY_AGREE). Final live totals after case 7: 70 GEN in = 70 GEN out, contract balance 0, escrow 0. `scripts/verify_evidence.mjs` checks the 6-case evidence set exactly and the aggregate ledger (60 GEN + 10 GEN per post-evidence case, in = out, balance 0, escrow 0).
 
+## Post-evidence browser validation test (case 8, not part of the evidence set)
+
+After case 7, the frontend input validation was proven in a real browser against the live GitHub Pages site, using in-browser temporary test accounts:
+
+- Case 8 created by script (client `0xB856BD17c01133b4147E1B8D9Fec8C3A25c5f6f0`, designated translator `0xa2a65adc0b606e346601dfdb6bab9d0547260c81`): source "The city library lends books for three weeks and charges a small fee for late returns.", target Spanish, brief "Library notice, plain style." — `0x7acb5c231fbaad347cf872e31cec2533f47d19935b31fd4b73b708aa8a69d7ec` ([explorer](https://explorer-studio.genlayer.com/tx/0x7acb5c231fbaad347cf872e31cec2533f47d19935b31fd4b73b708aa8a69d7ec))
+- As the designated translator, a 2001-character translation was entered in the live site: the counter showed "2001 / 2000" with the bilingual over-limit error, the submit button was disabled, and a forced click sent NO transaction (translator nonce 0 → 0, balance unchanged, no pending tx). Over-long input is blocked before any payable send, so it can no longer strand the 10 GEN fee.
+- Cleanup: case 8 cancelled by the client — `0xad7726387639530538af68ef994a237608b3b3302e2a5cb4d8ad3bf7f5c76a63` ([explorer](https://explorer-studio.genlayer.com/tx/0xad7726387639530538af68ef994a237608b3b3302e2a5cb4d8ad3bf7f5c76a63)) — FINALIZED + SUCCESS; 10 GEN refund withdrawn — `0xa09cdcf8f71cb1c6118039a3d3b17df5b490b83457296cf40c3b9369539b54d1` ([explorer](https://explorer-studio.genlayer.com/tx/0xa09cdcf8f71cb1c6118039a3d3b17df5b490b83457296cf40c3b9369539b54d1)) — FINALIZED + SUCCESS.
+
+All three case-8 txs were re-read live from their receipts (FINALIZED + MAJORITY_AGREE + leader SUCCESS). Final live totals after case 8: 80 GEN in = 80 GEN out, contract balance 0, escrow 0, case_count 8, case 8 CANCELLED / client_withdrawn true.
+
 ## Re-verify
 
 ```bash
