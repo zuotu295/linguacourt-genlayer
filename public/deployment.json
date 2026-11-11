@@ -1,0 +1,24 @@
+{
+  "network": "Stable Studionet",
+  "chain_id": 61999,
+  "rpc": "https://studio.genlayer.com/api",
+  "contract_address": "0xE3F85C032a4B9eEc2978aEf39885Bf5374291C5D",
+  "deploy_tx": "0x5b6267351029e4fc611224da9083b647e709091ba16b811f7ad02417974519a2",
+  "explorer": "https://explorer-studio.genlayer.com/address/0xE3F85C032a4B9eEc2978aEf39885Bf5374291C5D",
+  "source_sha256": "798b117d6d133b66f82c077e55276de25f79ec44abda1fe2ec574f3c4824ea67",
+  "source_bytes": 11708,
+  "source_file": "contracts/linguacourt.py",
+  "byte_parity": "BYTE_PARITY_MATCH: TRUE",
+  "fee_wei": "10000000000000000000",
+  "fee_gen": 10,
+  "wallets": {
+    "C1": "0x4e05d88b319437ae9a5bef07875ca042442f956c",
+    "C2": "0xfb45789ecea9c168943a3ae94457c104110ef595",
+    "C3": "0xa688d4686e47eb69af5ef61b6f39a94ee16c6c57",
+    "T1": "0x95767cc5e54ef352c751a11d30a41987c7811a4c",
+    "T2": "0xb6110db2318fd40038c7809f617477a843d680b6",
+    "T3": "0xa44fd353516765323d081c22c679015222a3f5c2",
+    "OUT": "0x452205fa04552381432406362693a3823b4629b8"
+  },
+  "note": "Temp accounts generated for this evidence run only."
+}
