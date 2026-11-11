@@ -125,6 +125,20 @@ TRANSLATOR_MUST_DIFFER (create with translator == client) is covered by mock tes
 
 - Archived under `evidence/v1/` (protocol `linguacourt-1`, contract `0xE3F85C032a4B9eEc2978aEf39885Bf5374291C5D`). Not v2 evidence.
 
+## Post-evidence browser write-loop test (case 7, not part of the evidence set)
+
+After the evidence run and its 45/45 verification, the live site's write
+loop was proven end to end in a real headless browser against the live
+GitHub Pages site, using in-browser temporary test accounts:
+
+- Case 7 created by script (client `0x0aae4809b19fd303eb520288892197c054d5af99`, designated translator `0x59d93d31ad803bf4a179b2b686bd716639f1fb01`): `0x801f1c914e2fc4ad5fbc844e28cc2ce1487111d74475587f048819b5cd8f49a8`
+- Submit as the designated translator temp account (key modal shown, "I saved my key" acknowledged, double-confirm dialog accepted): `0x68299fcffa78385f5e0e554c7849e0844b15a380a4a1d6e5e886dbd7514048ea` — FINALIZED + SUCCESS
+- Accept as the client temp account: `0x8a4a9489cbdfc8fe90c0d997f3139f485f859942ef1902ed5b3eeba9646eb58f` — FINALIZED + SUCCESS, case SETTLED_ACCEPT
+- Withdraw 10 GEN as the translator temp account (double-confirm dialog shown: action + 10 GEN + Case #7 + contract): `0xe2a1691e1e4432041a2242d9efa3b12efc22165c5263d1bcf7784c7304e68b4c` — FINALIZED + SUCCESS
+- Temp account attempting create_case was BLOCKED with the on-screen message (no tx sent).
+
+All three browser txs were re-read live from their receipts (method + sender + FINALIZED + MAJORITY_AGREE). Final live totals after case 7: 70 GEN in = 70 GEN out, contract balance 0, escrow 0. `scripts/verify_evidence.mjs` checks the 6-case evidence set exactly and the aggregate ledger (60 GEN + 10 GEN per post-evidence case, in = out, balance 0, escrow 0).
+
 ## Re-verify
 
 ```bash

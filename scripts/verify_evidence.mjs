@@ -76,12 +76,18 @@ for (const s of ev.steps) {
 
 await sleep(3000);
 const totals = JSON.parse(await reader.readContract({address: ADDRESS, functionName: 'get_totals', args: [], transactionHashVariant: 'latest-final'}));
-check('GEN accounting: 60 GEN in = 60 GEN out, balance 0, escrow 0',
-  totals.total_received_wei === 60000000000000000000
-  && totals.total_withdrawn_wei === 60000000000000000000
+// The evidence set is exactly 6 cases / 60 GEN. Later live use (e.g. the
+// browser write-loop test case, recorded separately in EVIDENCE.md) may
+// add cases, so the aggregate check is: received == 60 GEN + 10 GEN per
+// extra case, withdrawn == received, balance 0, escrow 0.
+const all = JSON.parse(await reader.readContract({address: ADDRESS, functionName: 'get_all_cases', args: [], transactionHashVariant: 'latest-final'}));
+const extraCases = all.length - 6;
+const expectedReceived = 60000000000000000000 + 10000000000000000000 * extraCases;
+check(`GEN accounting closes: ${expectedReceived / 1e18} GEN in = out, balance 0, escrow 0 (${extraCases} post-evidence case(s))`,
+  totals.total_received_wei === expectedReceived
+  && totals.total_withdrawn_wei === totals.total_received_wei
   && totals.contract_balance_wei === 0 && totals.escrowed_wei === 0,
   JSON.stringify(totals));
-const all = JSON.parse(await reader.readContract({address: ADDRESS, functionName: 'get_all_cases', args: [], transactionHashVariant: 'latest-final'}));
 const expect = {
   1: ['SETTLED_ACCEPT', 'ACCEPT', 10000000000000000000, 0],
   2: ['SETTLED_PARTIAL', 'PARTIAL', 5000000000000000000, 5000000000000000000],
@@ -92,6 +98,10 @@ const expect = {
 };
 for (const c of all) {
   const e = expect[c.case_id];
+  if (!e) {
+    console.log('NOTE post-evidence case ' + c.case_id + ' (not part of the evidence set): live=' + c.status + '/' + c.verdict);
+    continue;
+  }
   check(`case ${c.case_id} live status/verdict/credits == expected`,
     e && c.status === e[0] && c.verdict === e[1]
     && c.translator_credit === e[2] && c.client_credit === e[3],
