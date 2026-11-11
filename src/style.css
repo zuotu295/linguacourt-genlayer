@@ -115,3 +115,11 @@ footer.site p { margin: 4px 0; }
   .case-row { grid-template-columns: 32px 1fr auto; }
   .case-lang, .case-row .status { display: none; }
 }
+
+/* v2: temp-key acknowledgement modal + unknown-tx state */
+.key-modal { position: fixed; inset: 0; background: rgba(18, 20, 30, 0.55); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+.key-modal-card { max-width: 560px; width: 100%; padding: 24px; border-radius: 8px; }
+.key-line { word-break: break-all; background: #f7f3e8; border: 1px dashed var(--red); padding: 10px; border-radius: 6px; }
+.ack-row { display: flex; gap: 8px; align-items: flex-start; margin: 14px 0; font-size: 14px; }
+.tx-track.unknown { border-left-color: var(--amber); }
+.finalized-cell small { display: block; font-size: 11px; color: #8a8578; margin-top: 2px; }

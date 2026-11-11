@@ -1,8 +1,12 @@
 // LinguaCourt chain layer — GenLayer Stable Studionet only (Chain ID 61999).
 // Reads are pinned to latest-final. Writes go through an injected EVM
 // wallet (OKX first) or a labelled in-browser ephemeral test account.
+// Formal escrow funding (create_case) REQUIRES a persistent wallet:
+// a temporary test account is blocked from create_case by the UI layer
+// (see App.tsx) and must never be used to fund escrow.
 // No private keys are ever written to disk or sent anywhere; the temp key
-// lives in this tab's sessionStorage only.
+// lives in this tab's sessionStorage only, and is shown to the user once
+// with copy/export + an explicit "I saved my key" acknowledgement.
 import { createClient, createAccount, generatePrivateKey } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 
@@ -41,6 +45,10 @@ export interface Totals { total_received_wei: number; total_withdrawn_wei: numbe
 
 // The finalized flag is derived inside these functions from a real
 // latest-final read returning data — never assigned by a caller.
+// `at` is the wall-clock time THIS latest-final readback completed, in
+// ISO form. It is NOT an on-chain finalization timestamp (Studionet
+// exposes no block timestamp to the UI); the UI labels it as a readback
+// time, never as "finalized at" a chain time.
 export async function readAllCases(): Promise<{ cases: CaseRec[]; is_finalized_readback: boolean; at: string }> {
   const raw = await reader.readContract({ address: contractAddress(), functionName: 'get_all_cases', args: [], transactionHashVariant: 'latest-final' });
   const data = JSON.parse(raw) as CaseRec[];
@@ -55,8 +63,43 @@ export async function readCase(id: number): Promise<CaseRec> {
   return JSON.parse(raw) as CaseRec;
 }
 
+// ---- Tx lifecycle: hash saved immediately, timeout is "unknown" ----
+// A tx that times out while polling is NOT a failure: its on-chain
+// outcome is unknown, so the hash is kept in localStorage and polling
+// resumes (including after a page refresh) until FINALIZED is observed.
+export interface PendingTx { hash: string; label: string; savedAt: string }
+const PENDING_KEY = 'linguacourt-pending-txs';
+export function savePendingTx(hash: string, label: string) {
+  try {
+    const list: PendingTx[] = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+    if (!list.some((p) => p.hash === hash)) list.push({ hash, label, savedAt: new Date().toISOString() });
+    localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+  } catch { /* storage unavailable: hash is still shown on screen */ }
+}
+export function loadPendingTxs(): PendingTx[] {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; }
+}
+export function clearPendingTx(hash: string) {
+  try {
+    const list: PendingTx[] = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+    localStorage.setItem(PENDING_KEY, JSON.stringify(list.filter((p) => p.hash !== hash)));
+  } catch { /* ignore */ }
+}
+
+export class TxUnknownError extends Error {
+  hash: string;
+  constructor(hash: string) {
+    super('TX_UNKNOWN: sent but not yet FINALIZED — outcome unknown, still polling');
+    this.hash = hash;
+  }
+}
+
 export async function waitFinalized(hash: string) {
-  return reader.waitForTransactionReceipt({ hash, status: 'FINALIZED', interval: 3000, retries: 40, fullTransaction: true });
+  try {
+    return await reader.waitForTransactionReceipt({ hash, status: 'FINALIZED', interval: 3000, retries: 40, fullTransaction: true });
+  } catch {
+    throw new TxUnknownError(hash);
+  }
 }
 export function leaderReceipt(tx: any) {
   let r = tx?.consensus_data?.leader_receipt;
@@ -90,24 +133,54 @@ export function walletKind(): string {
   return 'No injected wallet detected';
 }
 
+async function switchToStudionet(provider: any) {
+  try {
+    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID_HEX }] });
+  } catch (e: any) {
+    // 4902 = chain not added yet; add it, then switch again.
+    if (e?.code === 4902) {
+      await provider.request({
+        method: 'wallet_addEthereumChain',
+        params: [{ chainId: CHAIN_ID_HEX, chainName: 'GenLayer Studionet', nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 }, rpcUrls: [RPC_URL], blockExplorerUrls: [EXPLORER_BASE] }],
+      });
+      await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID_HEX }] });
+    } else { throw e; }
+  }
+  const chainId = await provider.request({ method: 'eth_chainId' });
+  if (Number(chainId) !== CHAIN_ID) throw new Error('WRONG_CHAIN_AFTER_SWITCH: ' + String(chainId));
+}
+
 export interface Wallet { mode: 'injected' | 'temporary'; address: string; client: any; signer_mode: string; provider?: any }
 export async function connectInjected(): Promise<Wallet> {
   const provider = injectedProvider();
   if (!provider) throw new Error('NO_INJECTED_WALLET');
   const accounts = await provider.request({ method: 'eth_requestAccounts' });
-  const chainId = await provider.request({ method: 'eth_chainId' });
-  if (Number(chainId) !== CHAIN_ID) {
-    await provider.request({
-      method: 'wallet_addEthereumChain',
-      params: [{ chainId: CHAIN_ID_HEX, chainName: 'GenLayer Studionet', nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 }, rpcUrls: [RPC_URL], blockExplorerUrls: [EXPLORER_BASE] }],
-    });
-  }
+  await switchToStudionet(provider);
   const address = String(accounts[0]).toLowerCase();
   const client = createClient({ chain: studionet, provider, account: address });
   return { mode: 'injected', address, provider, client, signer_mode: 'INJECTED_WALLET' };
 }
+// Verify the injected wallet is still on Studionet before a write;
+// block the write (throw) until the chain is correct.
+export async function ensureInjectedChain(wallet: Wallet) {
+  if (wallet.mode !== 'injected' || !wallet.provider) return;
+  const chainId = await wallet.provider.request({ method: 'eth_chainId' });
+  if (Number(chainId) !== CHAIN_ID) {
+    await switchToStudionet(wallet.provider);
+  }
+}
 
 const TEMP_KEY = 'linguacourt-temp-private-key';
+const TEMP_ACK = 'linguacourt-temp-key-acked';
+export function tempPrivateKey(): string | null {
+  try { return sessionStorage.getItem(TEMP_KEY); } catch { return null; }
+}
+export function isTempKeyAcked(): boolean {
+  try { return sessionStorage.getItem(TEMP_ACK) === 'yes'; } catch { return false; }
+}
+export function ackTempKey() {
+  try { sessionStorage.setItem(TEMP_ACK, 'yes'); } catch { /* ignore */ }
+}
 export async function temporaryAccount(): Promise<Wallet> {
   let pk: string | null = null;
   try { pk = sessionStorage.getItem(TEMP_KEY); } catch { /* ignore */ }
@@ -118,7 +191,8 @@ export async function temporaryAccount(): Promise<Wallet> {
   const account = createAccount(pk as `0x${string}`);
   const client = createClient({ chain: studionet, account });
   // Testnet sim funding (free test GEN, zero cash cost) so the temp
-  // account can escrow the 10 GEN fee.
+  // account can act on cases it is designated for. Temp accounts are
+  // BLOCKED from create_case (escrow funding) by the UI.
   try {
     const bal = await client.getBalance({ address: account.address });
     if (bal < 20000000000000000000n) {
@@ -128,16 +202,23 @@ export async function temporaryAccount(): Promise<Wallet> {
   return { mode: 'temporary', address: String(account.address).toLowerCase(), client, signer_mode: 'BROWSER_EPHEMERAL_TEST_ACCOUNT' };
 }
 export function rotateTemporaryAccount() {
-  try { sessionStorage.removeItem(TEMP_KEY); } catch { /* ignore */ }
+  try { sessionStorage.removeItem(TEMP_KEY); sessionStorage.removeItem(TEMP_ACK); } catch { /* ignore */ }
   return temporaryAccount();
 }
 export function destroyTemporaryAccount() {
-  try { sessionStorage.removeItem(TEMP_KEY); } catch { /* ignore */ }
+  try { sessionStorage.removeItem(TEMP_KEY); sessionStorage.removeItem(TEMP_ACK); } catch { /* ignore */ }
 }
 
-export async function sendWrite(wallet: Wallet, functionName: string, args: any[], value = 0n) {
+// Send only: returns the hash immediately (caller must save it before
+// waiting). Waiting is separate so a timeout never loses the hash.
+export async function sendWriteOnly(wallet: Wallet, functionName: string, args: any[], value = 0n) {
   if (!wallet?.client) throw new Error('NO_SIGNER');
+  await ensureInjectedChain(wallet);
   const hash = await wallet.client.writeContract({ address: contractAddress(), functionName, args, value, leaderOnly: false });
+  return hash as string;
+}
+export async function sendWrite(wallet: Wallet, functionName: string, args: any[], value = 0n) {
+  const hash = await sendWriteOnly(wallet, functionName, args, value);
   const receipt = await waitFinalized(hash);
   return { hash, receipt };
 }
@@ -145,3 +226,8 @@ export async function sendWrite(wallet: Wallet, functionName: string, args: any[
 export const shortAddr = (a: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '—');
 export const gen = (wei: number) => (wei / 1e18).toString();
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Format a readback-completion time with an explicit timezone, so the
+// label can never be read as a chain finalization time.
+export const fmtReadbackTime = (iso: string) => {
+  try { return new Date(iso).toLocaleString(undefined, { timeZoneName: 'short' }); } catch { return iso; }
+};

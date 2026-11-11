@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CHAIN_ID, FEE_WEI, TARGET_LANGS, loadDeployment, DEPLOYMENT, contractAddress,
   explorerTx, explorerAddress, reader, readAllCases, readTotals, readCase,
-  sendWrite, waitFinalized, txGood, leaderExecution, leaderPayload,
+  sendWriteOnly, waitFinalized, txGood, leaderExecution, leaderPayload,
   connectInjected, temporaryAccount, rotateTemporaryAccount, destroyTemporaryAccount,
-  walletKind, shortAddr, gen, type CaseRec, type Totals, type Wallet,
+  tempPrivateKey, isTempKeyAcked, ackTempKey,
+  savePendingTx, loadPendingTxs, clearPendingTx, TxUnknownError,
+  fmtReadbackTime, walletKind, shortAddr, gen, type CaseRec, type Totals, type Wallet,
 } from './chain';
 import { t, type Lang } from './i18n';
 
-interface TxTrack { label: string; hash: string; stage: 'sent' | 'finalized-ok' | 'failed'; receipt?: any; error?: string }
+interface TxTrack { label: string; hash: string; stage: 'sent' | 'finalized-ok' | 'failed' | 'unknown'; receipt?: any; error?: string }
 
 const VERDICT_CLASS: Record<string, string> = { ACCEPT: 'v-accept', PARTIAL: 'v-partial', REJECT: 'v-reject' };
+const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 export default function App() {
   const [lang, setLang] = useState<Lang>('zh');
@@ -26,11 +29,20 @@ export default function App() {
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
+  const [keyModal, setKeyModal] = useState(false);
+  const [keyAcked, setKeyAcked] = useState(false);
+  const [keyCopied, setKeyCopied] = useState(false);
 
   const [src, setSrc] = useState('');
   const [target, setTarget] = useState('Spanish');
   const [brief, setBrief] = useState('');
+  const [translatorAddr, setTranslatorAddr] = useState('');
   const [trText, setTrText] = useState('');
+
+  const casesRef = useRef(cases);
+  casesRef.current = cases;
+  const walletRef = useRef(wallet);
+  walletRef.current = wallet;
 
   const refresh = useCallback(async () => {
     try {
@@ -44,76 +56,219 @@ export default function App() {
     }
   }, []);
 
+  // Resume tracking of txs whose hash was saved before a refresh/timeout.
+  // A resumed tx is never re-sent; it is only polled until FINALIZED.
+  const resumePending = useCallback(async () => {
+    const pending = loadPendingTxs();
+    for (const p of pending) {
+      setTx({ label: p.label, hash: p.hash, stage: 'sent' });
+      try {
+        const receipt = await waitFinalized(p.hash);
+        const ok = txGood(receipt);
+        setTx({ label: p.label, hash: p.hash, stage: ok ? 'finalized-ok' : 'failed', receipt, error: ok ? '' : leaderPayload(receipt) });
+        clearPendingTx(p.hash);
+        await refresh();
+      } catch (e) {
+        if (e instanceof TxUnknownError) {
+          setTx({ label: p.label, hash: p.hash, stage: 'unknown', error: t('txUnknown', lang) });
+        }
+        // Still unknown: keep the hash stored; next refresh resumes again.
+      }
+    }
+  }, [refresh, lang]);
+
   useEffect(() => {
     (async () => {
       try {
         setDep(await loadDeployment());
         await refresh();
+        await resumePending();
       } catch (e: any) {
         setLoadError(e?.message || String(e));
       } finally { setLoading(false); }
     })();
-  }, [refresh]);
+  }, [refresh, resumePending]);
+
+  // Warn before closing/navigating away while a temp account holds value.
+  useEffect(() => {
+    if (!wallet || wallet.mode !== 'temporary') return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [wallet]);
 
   const sel = useMemo(() => cases.find((c) => c.case_id === selected) || null, [cases, selected]);
 
-  async function doWrite(label: string, fn: string, args: any[], value = 0n) {
-    if (!wallet) { setNotice(t('notConnected', lang)); return null; }
+  function tempExposure(addr: string): string[] {
+    const lines: string[] = [];
+    for (const c of casesRef.current) {
+      const asT = c.translator === addr;
+      const asC = c.client === addr;
+      if (!asT && !asC) continue;
+      const parts: string[] = [`Case #${c.case_id} (${c.status})`];
+      if (asT && c.translator_credit > 0 && !c.translator_withdrawn) parts.push(`translator credit ${gen(c.translator_credit)} GEN unwithdrawn`);
+      if (asC && c.client_credit > 0 && !c.client_withdrawn) parts.push(`client credit ${gen(c.client_credit)} GEN unwithdrawn`);
+      if (c.status === 'OPEN' && asC) parts.push('10 GEN escrowed, case still OPEN');
+      if (c.status === 'SUBMITTED' && (asC || asT)) parts.push('10 GEN escrowed, case SUBMITTED');
+      lines.push(parts.join(' — '));
+    }
+    return lines;
+  }
+
+  async function confirmTempLoss(action: string): Promise<boolean> {
+    const w = walletRef.current;
+    if (!w || w.mode !== 'temporary') return true;
+    const lines = tempExposure(w.address);
+    const msg = (lang === 'zh'
+      ? `⚠ 你正在${action}临时测试账户 ${w.address}。\n没有私钥，这个地址将永远无法找回。\n`
+      : `⚠ You are about to ${action} the temporary test account ${w.address}.\nWithout its private key, this address is unrecoverable.\n`)
+      + (lines.length
+        ? (lang === 'zh' ? '与该地址有关的案件/资金：\n' : 'Cases / funds tied to this address:\n') + lines.join('\n') + '\n'
+        : (lang === 'zh' ? '该地址目前没有链上案件。\n' : 'This address currently has no on-chain cases.\n'))
+      + (lang === 'zh' ? '确定继续吗？（先导出私钥可避免丢失。）' : 'Continue? (Export the private key first to avoid losing access.)');
+    return window.confirm(msg);
+  }
+
+  async function doWrite(label: string, fn: string, args: any[], value = 0n, amountText = '') {
+    const w = walletRef.current;
+    if (!w) { setNotice(t('notConnected', lang)); return null; }
+    if (fn === 'create_case' && w.mode === 'temporary') {
+      setNotice(t('tempBlockedCreate', lang));
+      return null;
+    }
+    if (w.mode === 'temporary' && !isTempKeyAcked()) {
+      setKeyModal(true);
+      setNotice(t('keyModalTitle', lang));
+      return null;
+    }
+    const confirmText = `${t('confirmSend', lang)}\n— ${label}${amountText ? `\n— ${amountText}` : ''}\n— Contract: ${contractAddress()}\n— Network: Studionet 61999`;
+    if (!window.confirm(confirmText)) return null;
     setBusy(label);
     setNotice('');
     setTx({ label, hash: '', stage: 'sent' });
     try {
-      const { hash, receipt } = await sendWrite(wallet, fn, args, value);
+      // Hash is saved to localStorage IMMEDIATELY after send, before any wait.
+      const hash = await sendWriteOnly(w, fn, args, value);
+      savePendingTx(hash, label);
+      setTx({ label, hash, stage: 'sent' });
+      let receipt: any;
+      try {
+        receipt = await waitFinalized(hash);
+      } catch (e) {
+        if (e instanceof TxUnknownError) {
+          // Timeout is "unknown", never a final failure: keep polling in
+          // the background and let a refresh resume from the saved hash.
+          setTx({ label, hash, stage: 'unknown', error: t('txUnknown', lang) });
+          (async () => {
+            for (let i = 0; i < 10; i++) {
+              try {
+                const r2 = await waitFinalized(hash);
+                const ok2 = txGood(r2);
+                setTx({ label, hash, stage: ok2 ? 'finalized-ok' : 'failed', receipt: r2, error: ok2 ? '' : leaderPayload(r2) });
+                clearPendingTx(hash);
+                await refresh();
+                return;
+              } catch { /* still unknown; keep polling */ }
+            }
+          })();
+          return null;
+        }
+        throw e;
+      }
+      clearPendingTx(hash);
       const ok = txGood(receipt);
       setTx({ label, hash, stage: ok ? 'finalized-ok' : 'failed', receipt, error: ok ? '' : leaderPayload(receipt) });
       await refresh();
       return ok ? receipt : null;
     } catch (e: any) {
-      setTx({ label, hash: '', stage: 'failed', error: e?.shortMessage || e?.message || String(e) });
+      const msg = e?.shortMessage || e?.message || String(e);
+      if (String(msg).includes('WRONG_CHAIN')) setNotice(t('wrongChain', lang));
+      setTx({ label, hash: '', stage: 'failed', error: msg });
       return null;
     } finally { setBusy(''); }
   }
 
   async function onConnect() {
     setWalletBusy(true);
-    try { setWallet(await connectInjected()); }
-    catch (e: any) { setNotice('Wallet connect failed: ' + (e?.message || String(e))); }
-    finally { setWalletBusy(false); }
+    try {
+      const w = await connectInjected();
+      setWallet(w);
+    } catch (e: any) {
+      setNotice('Wallet connect failed: ' + (e?.message || String(e)));
+    } finally { setWalletBusy(false); }
   }
   async function onTemp() {
     setWalletBusy(true);
-    try { setWallet(await temporaryAccount()); }
-    catch (e: any) { setNotice('Temporary account failed: ' + (e?.message || String(e))); }
+    try {
+      const w = await temporaryAccount();
+      setWallet(w);
+      setKeyAcked(isTempKeyAcked());
+      if (!isTempKeyAcked()) setKeyModal(true);
+    } catch (e: any) { setNotice('Temporary account failed: ' + (e?.message || String(e))); }
     finally { setWalletBusy(false); }
   }
   async function onRotate() {
+    if (!(await confirmTempLoss(lang === 'zh' ? '更换' : 'rotate'))) return;
     setWalletBusy(true);
-    try { setWallet(await rotateTemporaryAccount()); }
-    catch (e: any) { setNotice(String(e?.message || e)); }
+    try {
+      const w = await rotateTemporaryAccount();
+      setWallet(w);
+      setKeyAcked(false);
+      setKeyModal(true);
+    } catch (e: any) { setNotice(String(e?.message || e)); }
     finally { setWalletBusy(false); }
   }
-  function onDisconnect() { destroyTemporaryAccount(); setWallet(null); }
+  async function onDisconnect() {
+    if (!(await confirmTempLoss(lang === 'zh' ? '断开' : 'disconnect'))) return;
+    destroyTemporaryAccount();
+    setWallet(null);
+  }
+  function copyTempKey() {
+    const pk = tempPrivateKey();
+    if (!pk) return;
+    navigator.clipboard?.writeText(pk).then(() => setKeyCopied(true)).catch(() => setKeyCopied(false));
+  }
+  function exportTempKey() {
+    const pk = tempPrivateKey();
+    if (!pk) return;
+    const blob = new Blob([pk + '\n'], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `linguacourt-temp-key-${wallet?.address || 'unknown'}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function confirmKeySaved() {
+    ackTempKey();
+    setKeyAcked(true);
+    setKeyModal(false);
+    setNotice(t('keySaved', lang));
+  }
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!wallet) { setNotice(t('notConnected', lang)); return; }
+    if (wallet.mode === 'temporary') { setNotice(t('tempBlockedCreate', lang)); return; }
     if (src.trim().length < 20) { setNotice('Source text must be 20–2000 characters. / 原文需 20–2000 字。'); return; }
-    const r = await doWrite(t('createTitle', lang), 'create_case', [src.trim(), target, brief.trim()], FEE_WEI);
-    if (r) { setSrc(''); setBrief(''); }
+    if (!ADDR_RE.test(translatorAddr.trim())) { setNotice('Designated translator address must be a 0x 42-char hex address. / 指定译者地址必须是 0x 开头的 42 位十六进制地址。'); return; }
+    if (translatorAddr.trim().toLowerCase() === wallet.address.toLowerCase()) { setNotice('Translator must differ from the client. / 译者不能是客户本人。'); return; }
+    const r = await doWrite(t('createTitle', lang), 'create_case', [src.trim(), target, brief.trim(), translatorAddr.trim().toLowerCase()], FEE_WEI, '10 GEN escrow');
+    if (r) { setSrc(''); setBrief(''); setTranslatorAddr(''); }
   }
   async function onSubmitTr(c: CaseRec) {
     if (trText.trim().length < 10) { setNotice('Translation must be 10–2000 characters. / 译文需 10–2000 字。'); return; }
-    const r = await doWrite(t('submitTr', lang), 'submit_translation', [c.case_id, trText.trim()]);
+    const r = await doWrite(t('submitTr', lang), 'submit_translation', [c.case_id, trText.trim()], 0n, `Case #${c.case_id}`);
     if (r) setTrText('');
   }
   async function onWithdraw(c: CaseRec) {
     if (!wallet) return;
-    await doWrite(t('withdraw', lang), 'withdraw', [c.case_id]);
+    const amt = wallet.address === c.translator ? gen(c.translator_credit) : gen(c.client_credit);
+    await doWrite(t('withdraw', lang), 'withdraw', [c.case_id], 0n, `${amt} GEN · Case #${c.case_id}`);
   }
   function exportDossier(c: CaseRec) {
     if (!readback.done) return;
     const dossier = {
-      product: 'LinguaCourt', protocol: 'linguacourt-1', network: 'Stable Studionet', chain_id: CHAIN_ID,
+      product: 'LinguaCourt', protocol: 'linguacourt-2', network: 'Stable Studionet', chain_id: CHAIN_ID,
       contract_address: contractAddress(), explorer: explorerAddress(contractAddress()),
       signer_mode: wallet?.signer_mode || 'READ_ONLY', readback_finalized_at: readback.at, case: c, totals,
     };
@@ -127,6 +282,7 @@ export default function App() {
 
   const me = wallet?.address || '';
   const canAct = (c: CaseRec) => me && c.status === 'SUBMITTED' && c.client === me;
+  const isTranslator = (c: CaseRec) => me && c.translator === me;
 
   return (
     <div className="page">
@@ -142,7 +298,7 @@ export default function App() {
           {wallet ? (
             <span className="wallet-chip">
               {t('connectedAs', lang)} {wallet.mode === 'temporary' ? '🧪 ' : ''}{shortAddr(wallet.address)}
-              {wallet.mode === 'temporary' && <button className="mini" onClick={onRotate}>{t('rotate', lang)}</button>}
+              {wallet.mode === 'temporary' && <><button className="mini" onClick={exportTempKey}>{t('exportKey', lang)}</button><button className="mini" onClick={onRotate}>{t('rotate', lang)}</button></>}
               <button className="mini" onClick={onDisconnect}>{t('disconnect', lang)}</button>
             </span>
           ) : (
@@ -154,9 +310,28 @@ export default function App() {
         </div>
       </header>
 
-      {wallet?.mode === 'temporary' && <div className="temp-banner">🧪 {t('tempNote', lang)} — {wallet.address}</div>}
+      {wallet?.mode === 'temporary' && <div className="temp-banner">🧪 {t('tempNote', lang)} — {wallet.address} <button className="mini" onClick={exportTempKey}>{t('exportKey', lang)}</button></div>}
       {!wallet && <div className="temp-banner neutral">{t('notConnected', lang)}</div>}
       {notice && <div className="notice">{notice}</div>}
+
+      {keyModal && wallet?.mode === 'temporary' && (
+        <div className="key-modal" role="dialog" aria-modal="true">
+          <div className="key-modal-card paper">
+            <h3>{t('keyModalTitle', lang)}</h3>
+            <p>{t('keyModalBody', lang)}</p>
+            <p className="mono small">Temp address: {wallet.address}</p>
+            <p className="mono key-line">{tempPrivateKey() || '—'}</p>
+            <div className="actions">
+              <button className="btn" onClick={copyTempKey}>{t('keyCopy', lang)}{keyCopied ? ' ✓' : ''}</button>
+              <button className="btn" onClick={exportTempKey}>{t('keyExport', lang)}</button>
+            </div>
+            <label className="ack-row">
+              <input type="checkbox" checked={keyAcked} onChange={(e) => setKeyAcked(e.target.checked)} /> {t('keyAck', lang)}
+            </label>
+            <button className="btn primary" onClick={confirmKeySaved} disabled={!keyAcked}>{t('keySaved', lang)}</button>
+          </div>
+        </div>
+      )}
 
       <main className="wrap">
         <section className="hero">
@@ -184,14 +359,16 @@ export default function App() {
           <div><span>{t('docket', lang)}</span><b>{totals ? String(totals.case_count) : '—'}</b></div>
           <div className="finalized-cell">
             <span>{readback.done ? t('finalizedAt', lang) : t('unconfirmed', lang)}</span>
-            <b>{readback.done ? new Date(readback.at).toLocaleString() : '—'}</b>
+            <b>{readback.done ? fmtReadbackTime(readback.at) : '—'}</b>
+            {readback.done && <small title={t('readbackNote', lang)}>ⓘ {t('readbackNote', lang)}</small>}
           </div>
         </section>
 
         {tx && (
           <section className={`tx-track ${tx.stage}`}>
             <b>{t('txProgress', lang)} · {tx.label}</b>
-            {tx.stage === 'sent' && <p>⏳ {t('sent', lang)}</p>}
+            {tx.stage === 'sent' && <p>⏳ {t('sent', lang)}{tx.hash ? <> · <a href={explorerTx(tx.hash)} target="_blank" rel="noreferrer">{tx.hash.slice(0, 18)}… {t('viewExplorer', lang)}</a></> : ''}</p>}
+            {tx.stage === 'unknown' && <p>❓ {t('txUnknown', lang)}{tx.hash ? <> · <a href={explorerTx(tx.hash)} target="_blank" rel="noreferrer">{tx.hash.slice(0, 18)}… {t('viewExplorer', lang)}</a></> : ''}</p>}
             {tx.stage === 'finalized-ok' && <p>✅ {t('finalizedOk', lang)} · <a href={explorerTx(tx.hash)} target="_blank" rel="noreferrer">{tx.hash.slice(0, 18)}… {t('viewExplorer', lang)}</a></p>}
             {tx.stage === 'failed' && <p>❌ {t('txFailed', lang)}{tx.hash ? <> · <a href={explorerTx(tx.hash)} target="_blank" rel="noreferrer">{t('viewExplorer', lang)}</a></> : ''}{tx.error ? <code> {tx.error.slice(0, 200)}</code> : ''}</p>}
           </section>
@@ -214,7 +391,11 @@ export default function App() {
                   <input value={brief} onChange={(e) => setBrief(e.target.value)} placeholder={t('briefPh', lang)} maxLength={500} />
                 </label>
               </div>
+              <label>{t('translatorLabel', lang)}
+                <input value={translatorAddr} onChange={(e) => setTranslatorAddr(e.target.value)} placeholder={t('translatorPh', lang)} maxLength={42} required />
+              </label>
               <p className="fee-note">{t('feeNote', lang)}</p>
+              {wallet?.mode === 'temporary' && <p className="notice">{t('tempBlockedCreate', lang)}</p>}
               <button className="btn primary" type="submit" disabled={!!busy || !wallet}>{busy ? '⏳ …' : t('createBtn', lang)}</button>
               {!wallet && <p className="hint">{t('notConnected', lang)}</p>}
             </form>
@@ -260,16 +441,24 @@ export default function App() {
                     <textarea value={trText} onChange={(e) => setTrText(e.target.value)} placeholder={t('translationPh', lang)} rows={3} />
                     <button className="btn primary" onClick={() => onSubmitTr(sel)} disabled={!!busy || !wallet}>{t('submitTr', lang)}</button>
                     {me && me === sel.client && <p className="hint">The client cannot translate their own case. / 客户不能翻译自己的案件。</p>}
+                    {me && me !== sel.translator && me !== sel.client && <p className="hint">Only the designated translator ({shortAddr(sel.translator)}) can submit. / 只有指定译者可以提交译文。</p>}
+                    {me && me === sel.client && (
+                      <button className="btn danger" onClick={() => doWrite(t('cancel', lang), 'cancel_case', [sel.case_id], 0n, `10 GEN refund · Case #${sel.case_id}`)} disabled={!!busy}>{t('cancel', lang)}</button>)}
                   </div>
                 )}
                 {sel.status === 'SUBMITTED' && canAct(sel) && (
                   <div className="actions">
-                    <button className="btn primary" onClick={() => doWrite(t('accept', lang), 'accept_case', [sel.case_id])} disabled={!!busy}>{t('accept', lang)}</button>
-                    <button className="btn danger" onClick={() => doWrite(t('dispute', lang), 'dispute_case', [sel.case_id])} disabled={!!busy}>{t('dispute', lang)}</button>
+                    <button className="btn primary" onClick={() => doWrite(t('accept', lang), 'accept_case', [sel.case_id], 0n, `10 GEN to translator · Case #${sel.case_id}`)} disabled={!!busy}>{t('accept', lang)}</button>
+                    <button className="btn danger" onClick={() => doWrite(t('dispute', lang), 'dispute_case', [sel.case_id], 0n, `Case #${sel.case_id} · verdict by validators`)} disabled={!!busy}>{t('dispute', lang)}</button>
                   </div>
                 )}
-                {sel.status === 'SUBMITTED' && me && !canAct(sel) && <p className="hint">Only the case client can accept or dispute. / 只有案件客户可以接受或提交争议。</p>}
-                {sel.status.startsWith('SETTLED') && (
+                {sel.status === 'SUBMITTED' && isTranslator(sel) && (
+                  <div className="actions">
+                    <button className="btn danger" onClick={() => doWrite(t('escalate', lang), 'escalate_to_dispute', [sel.case_id], 0n, `Case #${sel.case_id} · verdict by validators`)} disabled={!!busy}>{t('escalate', lang)}</button>
+                  </div>
+                )}
+                {sel.status === 'SUBMITTED' && me && !canAct(sel) && !isTranslator(sel) && <p className="hint">Only the case client can accept or dispute. / 只有案件客户可以接受或提交争议。</p>}
+                {(sel.status.startsWith('SETTLED') || sel.status === 'CANCELLED') && (
                   <div className="actions">
                     {me === sel.translator && sel.translator_credit > 0 && !sel.translator_withdrawn && (
                       <button className="btn primary" onClick={() => onWithdraw(sel)} disabled={!!busy}>{t('withdrawT', lang)} · {gen(sel.translator_credit)} GEN</button>)}
@@ -294,7 +483,7 @@ export default function App() {
 
       <footer className="site">
         <div className="wrap">
-          <p><b>LinguaCourt 译审庭</b> · GenLayer Stable Studionet (Chain ID 61999) · Intelligent Contract · linguacourt-1</p>
+          <p><b>LinguaCourt 译审庭</b> · GenLayer Stable Studionet (Chain ID 61999) · Intelligent Contract · linguacourt-2</p>
           <p className="mono">Contract: {dep ? dep.contract_address : 'awaiting deployment.json — UNCONFIRMED'}{dep && <> · <a href={explorerAddress(dep.contract_address)} target="_blank" rel="noreferrer">explorer-studio.genlayer.com</a></>}</p>
           <p className="mono small">Source SHA-256: {dep ? dep.source_sha256 : '—'} · Fee: 10 GEN fixed · {t('verdictExpl', lang)}</p>
         </div>
