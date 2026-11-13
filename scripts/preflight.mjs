@@ -18,7 +18,7 @@ check('pending release has no recycled address or receipt', plan.status !== 'awa
 const old = JSON.parse(fs.readFileSync(path.join(root, 'evidence/v2/deployment.json')));
 const oldBytes = fs.readFileSync(path.join(root, 'evidence/v2/linguacourt.py'));
 check('historical v2 exact source retained', createHash('sha256').update(oldBytes).digest('hex') === old.source_sha256);
-for (const file of ['deploy_studionet.mjs', 'run_evidence.mjs', 'verify_evidence.mjs']) {
+for (const file of ['deploy_studionet.mjs', 'run_evidence.mjs', 'verify_evidence.mjs', 'capture_readback.mjs', 'rpc_journal.mjs']) {
   execFileSync(process.execPath, ['--check', path.join(root, 'scripts', file)]);
   console.log('PASS syntax ' + file);
 }

@@ -15,7 +15,7 @@ role violations, repeated submissions/escalations, invalid clock context, indepe
 validator disagreement and injected brief instructions are included. These are not
 live consensus or claims of prompt-injection immunity.
 
-v3 requires a fresh deployment. No v3 address/receipt currently exists.
+v3 has a fresh deployment recorded in `evidence/v3/deployment.json`. Deployment and source parity are verified. Independent review-stage verification produced 68 PASS, 0 FAIL; post-deadline escalation and final withdrawal remain pending. See [chain verification](evidence/v3/LIVE_VALIDATION.md).
 [Expected live cases](EXPECTED.md) include brief-only verdict differences, an early
 escalation failure with unchanged state, and successful escalation after 24 hours.
 Real transactions must be FINALIZED with agreed consensus and expected execution;

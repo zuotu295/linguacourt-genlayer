@@ -12,7 +12,7 @@ A translation-quality escrow court on GenLayer Stable Studionet (Chain ID 61999)
 
 Withdraw is pull-payment, once per entitled party per case. Sender-bound roles: only the case client can accept, dispute or cancel; only the designated translator can submit or escalate; one translation per case; dispute/escalation only after submission; accept only before dispute. A verbatim copy of the source is rejected deterministically, without any LLM call.
 
-**Release status:** source is v3; deployment and real consensus verification are pending.
+**Release status:** v3 is deployed on Stable Studionet; the live evidence suite is in progress. The post-review escalation proof requires the real 24-hour deadline. See [chain verification](evidence/v3/LIVE_VALIDATION.md).
 The live site and root `evidence/deployment.json` / `transactions.json` are historical v2.
 They are retained unchanged and are not evidence of the v3 fixes.
 
@@ -66,18 +66,20 @@ npm run preview
 
 ```bash
 npm test                   # 29 local contract tests; mocked LLM/VM, not live consensus
+npm run test:rpc           # 4 broadcast journal tests; no network access
 npm run typecheck          # TypeScript SDK and UI checks
+node scripts/verify_evidence.mjs --review-checkpoint  # partial review-stage verification; not full acceptance
 npm run build              # Vite production build
 npm run preflight          # offline source/manifest/script consistency; no signer
 node scripts/verify_evidence.mjs --historical-v2  # read-only historical v2 verification
 node scripts/verify_evidence.mjs                  # fails until v3 deployment/evidence exists
 ```
 
-The v3 deployment descriptor is `evidence/v3/deployment.json` and is currently
-`awaiting_deployment`, with no address or transaction hash. `public/deployment.json`
+The v3 deployment descriptor is `evidence/v3/deployment.json`; it records a fresh
+FINALIZED deployment with byte-for-byte source parity. `public/deployment.json`
 uses the same descriptor: the v3 UI refuses historical v2 addresses. The existing
 Pages site still runs the historical release until the new build is published.
-No v3 chain validation has been performed. See [local validation](evidence/v3/LOCAL_VALIDATION.md)
+Deployment, source parity and the review checkpoint have been independently verified (68 PASS, 0 FAIL). The post-deadline escalation proof is still pending. See [local validation](evidence/v3/LOCAL_VALIDATION.md)
 and [live test expectations](EXPECTED.md).
 
 After deployment, record FINALIZED + MAJORITY_AGREE + leader SUCCESS, verify exact

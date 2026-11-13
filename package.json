@@ -12,7 +12,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "postbuild": "node scripts/write_version.mjs",
     "typecheck": "tsc --noEmit",
-    "preflight": "node scripts/preflight.mjs"
+    "preflight": "node scripts/preflight.mjs",
+    "test:rpc": "node --test tests/rpc_journal.test.mjs"
   },
   "dependencies": {
     "genlayer-js": "1.1.8",

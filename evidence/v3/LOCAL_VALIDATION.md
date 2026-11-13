@@ -2,7 +2,7 @@
 
 Source protocol: `linguacourt-3`. Network target: Stable Studionet 61999.
 Source SHA-256: `0a201dd7ab87b1fc5bf342083d3255873b1acb8a0b8f5d8578a8bf537a197feb`.
-No v3 deployment, wallet signature, consensus receipt or live settlement is claimed.
+This file records the initial pre-deployment local run. It does not establish wallet signatures, consensus receipts or live settlement. Subsequent chain results are recorded separately in [LIVE_VALIDATION.md](LIVE_VALIDATION.md).
 
 | Requirement | Implementation | Automated local coverage |
 | --- | --- | --- |
@@ -33,10 +33,7 @@ Observed results:
 Initial test setup lacked pytest; installing the pinned test dependency resolved it.
 The first optional TypeScript check exposed missing original type declarations and
 SDK type mismatches; these were fixed and the final check passed. No failed chain
-records were deleted or reclassified. A combined deployment script preflight was
-blocked by automatic review because the file also contains signing/deployment
-capabilities. The separate offline preflight and direct read-only chain-ID request
-completed; no deployment attempt was made.
+records were deleted or reclassified. The initial offline preflight and direct read-only chain-ID request completed; subsequent deployments and live attempts are recorded separately.
 
 ## Chain validation still required
 
@@ -48,5 +45,4 @@ complete withdrawal accounting. The 24 hours is measured from submission transac
 time, not from finalization or the browser clock. Validator model quality and prompt
 injection resistance remain empirical, not established by canned unit fixtures.
 
-The root v2 deployment/transactions and historical Pages build remain historical;
-v3 build inputs deliberately contain a pending descriptor without an address.
+The root v2 deployment/transactions and historical Pages build remain historical. The initial v3 build used a pending descriptor; after the fresh deployment, `public/deployment.json` was updated to the actual v3 descriptor.

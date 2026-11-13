@@ -1,0 +1,365 @@
+{
+  "network": "Stable Studionet",
+  "chain_id": 61999,
+  "contract_address": "0xD72656e8DC07fC2Be3849e64568bE5dB4AD2BdF2",
+  "deploy_tx": "0x26138a1ec3f371ab4d70014707c3000c0118b0dcd284c5e0fc32089dde05ff86",
+  "fee_gen": 10,
+  "partial": true,
+  "steps": [
+    {
+      "label": "neg0 wrong-fee-create",
+      "hash": "0xde66230b8839abb91e4275d25eb104b326225007e987253751134b82469275e8",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "FEE_MUST_BE_10_GEN"
+    },
+    {
+      "label": "case1 create",
+      "hash": "0x0bb8e40a721fe57267f6742d0121072de85635eb77ecbed1a980e3be311c7631",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg1 client-submits-own",
+      "hash": "0x50377a5564ce998d6efb4348cba9fc53b8f8850073409682665d49becf2733be",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "CLIENT_CANNOT_TRANSLATE_OWN_CASE"
+    },
+    {
+      "label": "case1 submit good Spanish",
+      "hash": "0x9f3ad704424bed5fb5e35e251282c43963064efdc9f1b149a972d55227d991aa",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg2 duplicate-submit",
+      "hash": "0x0c86dca0b248287a54b359844d14e677f70f548cde1e2d82c7886775b800323f",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "CASE_NOT_OPEN"
+    },
+    {
+      "label": "neg3 outsider-accept",
+      "hash": "0xaf8d143919f95edc184543d03f0dbf2c1fe0caac2b859a1c0e9ffd8030d9bee5",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "ONLY_CLIENT_CAN_ACCEPT"
+    },
+    {
+      "label": "case1 accept",
+      "hash": "0xf3c9f04dfa933c18a8bfbdc6ef00efbc29d1fec49a982119d75301956b0ac771",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case1 translator withdraw 10 GEN",
+      "hash": "0x881e21a02ce14ca3bb6a00f38842f9bc8df128bf48db9b3f524460f6d420e3c3",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg5 double-withdraw",
+      "hash": "0xc75febe4aff6b07eecb8471994fa60f1295047ad6f25b1ae9edf830e6b5fb79d",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "NO_CREDIT"
+    },
+    {
+      "label": "case2 create",
+      "hash": "0x77e89190cc25e551d2c841b61fc1e871c78c78969416522361d426cc06bc4aad",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case2 submit partial French",
+      "hash": "0x835cbcc5212af4ab09d6911e59be88ade604e632d0607e09c351affe34c05e8f",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg4 outsider-dispute",
+      "hash": "0x26fcc094c7b88e1d37a45ba94015e2c5854273a8bcd77af15e8715b83067015d",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "ONLY_CLIENT_CAN_DISPUTE"
+    },
+    {
+      "label": "case2 dispute",
+      "hash": "0xcbad0801fc06d60327535b99ad18f03b6c3a9cfb4189de07c6b65b9ff2c77b2c",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS",
+      "attempt": 1
+    },
+    {
+      "label": "case2 translator withdraw 5 GEN",
+      "hash": "0xb651ae31f3267cb8b51dffe366aafc3ea7460a9cf41559727ea76c7bcd128e8f",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case2 client withdraw 5 GEN",
+      "hash": "0x1f544ef3ed630cb92edb8454f40f5fb234ae75dae2faf8acbbe96efa9ef4b544",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case3 create",
+      "hash": "0xf283687957742ee29b9f0257dfa3ae241149a4af21cd0297dd434d042f21a1d6",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case3 submit wrong-language French",
+      "hash": "0xc72df3a94977f6c1a6c8032195cb818770212502a7460232476614b1ab9da683",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case3 dispute",
+      "hash": "0x43b0649246ddbcf504b6043c357f290fabb9e83204bb55c772fc2e0f2608372c",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS",
+      "attempt": 1
+    },
+    {
+      "label": "case3 client withdraw 10 GEN",
+      "hash": "0x38e61890d4923f340efeed4c938676e6a0d98112bbc380d677002971d4ee68fd",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg6 translator-no-credit-withdraw",
+      "hash": "0xbc6a04fc00005fd9b38cdc2523b7847a11bdecbe4f1dc882689718696d7115c0",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "NO_CREDIT"
+    },
+    {
+      "label": "case4 create",
+      "hash": "0xcb8d999748843b98e727714224c7b7153b67c08b094273dadf4d35b7efcdc293",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg7 outsider-cancel",
+      "hash": "0x3f2009ac453c9f263521458a09cfd97c775d3ec84c64b5625eed553f35a8ca21",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "ONLY_CLIENT_CAN_CANCEL"
+    },
+    {
+      "label": "case4 cancel from OPEN",
+      "hash": "0x75c6182c71bd3bd3244f4b09e80ebfdf1866049863347924dec957d711c76995",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case4 client withdraw 10 GEN refund",
+      "hash": "0xbf3c88a15b37e770eb7d097f20eed44f01aa1e2a99993471f03ab9e5349335f8",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case5 create",
+      "hash": "0x2c5d582cba40c189dbbb73cc10a2363b3526220b3f52f9ddb7f1d5e1d00e530a",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg8 non-designated-submit",
+      "hash": "0x3a317e1d8b525b305e991bb3fa4c6e5e799b87b39964cdef40b8b76c706f28b0",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "NOT_DESIGNATED_TRANSLATOR"
+    },
+    {
+      "label": "case5 submit good Spanish",
+      "hash": "0x9e1c65fc18a09ee05ff1ad8ab73d41d3e6ff148a4aba83545531027024bab149",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "neg9 cancel-after-submit",
+      "hash": "0x71dbf0744e6d222730223262e25b7e69e77952a692b44f7aa231df290f7d448e",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "CASE_NOT_OPEN"
+    },
+    {
+      "label": "neg10 early-escalation",
+      "hash": "0x2a148c1e7562aca29d0995bb52530e2f06d9e02a10d1283215cb29ee3709c7ea",
+      "outcome": "error-observed",
+      "status": 7,
+      "result": 6,
+      "leader": "ERROR",
+      "payload": "CLIENT_REVIEW_PERIOD_ACTIVE"
+    },
+    {
+      "label": "case6 create",
+      "hash": "0x541a4be1e3d0299555db1e846a1687b78cd86ce7ddb6a6dfd36918453875650b",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case6 submit injection translation",
+      "hash": "0x3d48bff074deaa3a5539743fa556cbcc0f8c0dedff65792d061fa44dd0303ad9",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case6 dispute (injection)",
+      "hash": "0xbdbf209374109b750acbc9a80b7a15436a01e32881f16f85a9e2f7535904416b",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS",
+      "attempt": 1
+    },
+    {
+      "label": "case6 client withdraw 10 GEN",
+      "hash": "0xf906db244a9e2684dc3d4e5c5d4e1bba535d66e65b4690d89a6325f3bdf95bec",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case7 create",
+      "hash": "0x646bab1d2bbff1171113aec06727d814875bd602a454ee268fcd2f693b3c88bc",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case7 submit",
+      "hash": "0x3c211c960a951525b10dbbceb28bd5f41a32ebf18996ce6e3635f4d72fb2ee01",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case7 brief satisfied",
+      "hash": "0xf7df1d17f720a9985257228f0bd87af760863be917a0848d02c15622c67e8404",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS",
+      "attempt": 1
+    },
+    {
+      "label": "case7 translator withdraw",
+      "hash": "0x873a6ff990ffc7d9f45bf9b1a553c047ce3735e18b33e1847d341ab704721dc4",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case8 create",
+      "hash": "0x258be93bf4cb260262a048f27eb0bf683230cf4f4190f17dbab7652f58251165",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case8 submit same translation",
+      "hash": "0xbca10078e97148ec51bae3eef19288b6622dca5a90c2d05826a5f4b4001eced0",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case8 brief violated",
+      "hash": "0xce523a29c1a05fc3c3bc5c2654d13557f75d5720db2619588b4b308f2513a3d5",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS",
+      "attempt": 1
+    },
+    {
+      "label": "case8 translator withdraw",
+      "hash": "0x7ab14556518d0cbfe53b424c4606a698d484a6e9d122226f99ed1f456d2856f4",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    },
+    {
+      "label": "case8 client withdraw",
+      "hash": "0xe53ceb473effdcbb778ddb0b4a23db33b8551e7b23499edc9196af098b201f73",
+      "outcome": "ok",
+      "status": 7,
+      "result": 6,
+      "leader": "SUCCESS"
+    }
+  ],
+  "totals": null,
+  "cases": null,
+  "accounting_ok": false
+}

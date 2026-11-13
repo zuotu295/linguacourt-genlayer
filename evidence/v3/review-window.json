@@ -1,0 +1,34 @@
+{
+  "contract_address": "0xD72656e8DC07fC2Be3849e64568bE5dB4AD2BdF2",
+  "case": {
+    "brief": "Museum notice, silent client",
+    "case_id": 5,
+    "client": "0xc290080a176e56b770b612e834e1104cca92c18f",
+    "client_credit": 0,
+    "client_withdrawn": false,
+    "fee_wei": 10000000000000000000,
+    "reason": "",
+    "review_deadline": 1794623988,
+    "review_period_seconds": 86400,
+    "source_text": "The museum opens at nine in the morning and closes at six in the evening. Admission is free on Sundays.",
+    "status": "SUBMITTED",
+    "submitted_at": 1794537588,
+    "target_lang": "Spanish",
+    "translation": "El museo abre a las nueve de la mañana y cierra a las seis de la tarde. La entrada es gratuita los domingos.",
+    "translator": "0xcbade4ee85cb5d0d03419d70fb1330194baf10f0",
+    "translator_credit": 0,
+    "translator_withdrawn": false,
+    "verdict": ""
+  },
+  "readback_at": "2026-11-13T02:51:28.876Z",
+  "early_escalation": {
+    "label": "neg10 early-escalation",
+    "hash": "0x2a148c1e7562aca29d0995bb52530e2f06d9e02a10d1283215cb29ee3709c7ea",
+    "outcome": "error-observed",
+    "status": 7,
+    "result": 6,
+    "leader": "ERROR",
+    "payload": "CLIENT_REVIEW_PERIOD_ACTIVE"
+  },
+  "post_deadline_escalation": false
+}
