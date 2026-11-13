@@ -2,7 +2,7 @@ export type Lang = 'zh' | 'en';
 export const STR: Record<string, Record<Lang, string>> = {
   tagline: { zh: '翻译质量托管法庭 · 译文对错，由共识裁决', en: 'Translation-quality escrow court · consensus judges the translation' },
   heroTitle: { zh: '译文好不好，\n不该由一个人说了算。', en: 'Whether a translation\nis good should not be\none person’s call.' },
-  heroSub: { zh: '客户托管 10 GEN 发布译单，译者提交译文。接受，全额付款；有争议，GenLayer 验证者对照原文裁决 ACCEPT / PARTIAL / REJECT，合约代码按裁决分钱——不多一分，不少一分。', en: 'A client escrows 10 GEN and posts a job; a translator submits. Accept and the fee is released in full. Dispute, and GenLayer validators judge the translation against the source — ACCEPT / PARTIAL / REJECT — and deterministic code splits the fee. Not a wei more, not a wei less.' },
+  heroSub: { zh: '客户托管 10 GEN 发布译单，译者提交译文。接受，全额付款；有争议，GenLayer 验证者对照原文及客户要求裁决 ACCEPT / PARTIAL / REJECT，合约代码按裁决分钱——不多一分，不少一分。', en: 'A client escrows 10 GEN and posts a job; a translator submits. Accept and the fee is released in full. Dispute, and GenLayer validators judge the translation against the source and stored client brief — ACCEPT / PARTIAL / REJECT — and deterministic code splits the fee. Not a wei more, not a wei less.' },
   howItWorks: { zh: '流程 · 四步', en: 'How it works · four steps' },
   step1: { zh: '客户发单并托管 10 GEN', en: 'Client posts a job, escrows 10 GEN' },
   step2: { zh: '译者提交译文', en: 'Translator submits a translation' },

@@ -1,12 +1,12 @@
-// LinguaCourt v2 evidence run on Stable Studionet (61999).
+// LinguaCourt v3 evidence run on Stable Studionet (61999).
 // Pre-registered expectations: EXPECTED.md (written before this run).
 // 6 cases (ACCEPT / PARTIAL / REJECT / CANCEL / ESCALATE-ACCEPT /
 // INJECTION-REJECT) + 10 on-chain negative calls that must fail on-chain
 // as contract_error with no state change (TRANSLATOR_MUST_DIFFER is an
 // 11th negative covered by mock tests only — it would strand 10 GEN
 // on-chain, so it is never sent). Every tx is waited to FINALIZED
-// and checked; GEN accounting is verified exact at the end (60 GEN in =
-// 60 GEN out, escrow 0). Disputes/escalations retry (max 3) only when
+// and checked; GEN accounting is verified exact at the end (80 GEN in =
+// 80 GEN out, escrow 0). Disputes/escalations retry (max 3) only when
 // consensus itself disagrees (MAJORITY_DISAGREE, state unchanged); a
 // wrong verdict aborts loudly.
 // RESUME: after every step the partial file evidence/transactions.json
@@ -16,6 +16,7 @@
 // Usage: node scripts/run_evidence.mjs [--checkpoint <path>]
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {createClient, createAccount} from 'genlayer-js';
 import {studionet} from 'genlayer-js/chains';
@@ -29,19 +30,25 @@ const opt = (name, def) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : def;
 };
 const CHECKPOINT = opt('--checkpoint', path.resolve(REPO, '..', '.linguacourt-checkpoint.json'));
-const EVIDENCE = path.join(REPO, 'evidence');
+const EVIDENCE = path.join(REPO, 'evidence', 'v3');
 const OUT_PATH = path.join(EVIDENCE, 'transactions.json');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+if (!args.includes('--send')) throw new Error('Signing required: use --send only after reviewing calls');
 const cp = JSON.parse(fs.readFileSync(CHECKPOINT, 'utf8'));
 const deployment = JSON.parse(fs.readFileSync(path.join(EVIDENCE, 'deployment.json'), 'utf8'));
 const ADDRESS = deployment.contract_address;
+if (!ADDRESS || deployment.protocol !== 'linguacourt-3') throw new Error('V3_NOT_DEPLOYED: historical v2 evidence cannot validate v3');
+if (cp.contract_address !== ADDRESS || cp.source_sha256 !== deployment.source_sha256) throw new Error('CHECKPOINT_DEPLOYMENT_MISMATCH');
 const accounts = {};
 for (const [k, pk] of Object.entries(cp.wallets)) accounts[k] = createAccount(pk);
 const clients = {};
 for (const [k, a] of Object.entries(accounts)) clients[k] = createClient({chain: studionet, account: a});
 const reader = createClient({chain: studionet});
 if ((await reader.getChainId()) !== CHAIN_ID) throw new Error('WRONG_CHAIN');
+const source = fs.readFileSync(path.join(REPO, 'contracts/linguacourt.py'), 'utf8');
+if (createHash('sha256').update(source).digest('hex') !== deployment.source_sha256 || await reader.getContractCode(ADDRESS) !== source) throw new Error('SOURCE_PARITY_MISMATCH');
+if (await reader.readContract({address: ADDRESS, functionName: 'get_protocol', args: [], transactionHashVariant: 'latest-final'}) !== 'linguacourt-3') throw new Error('PROTOCOL_MISMATCH');
 
 // ---- resume state ----
 let steps = [];
@@ -50,10 +57,11 @@ try {
   const prev = JSON.parse(fs.readFileSync(OUT_PATH, 'utf8'));
   if (prev.contract_address === ADDRESS && Array.isArray(prev.steps)) {
     steps = prev.steps;
-    done = new Set(steps.map((s) => s.label));
+    if (steps.some(s => s.outcome === 'UNEXPECTED')) throw new Error('Previous unexpected result requires inspection');
+    done = new Set(steps.filter(s => ['ok', 'error-observed'].includes(s.outcome)).map(s => s.label));
     console.log('RESUME: skipping', done.size, 'already-recorded steps for', ADDRESS);
   }
-} catch { /* no partial file yet */ }
+} catch (e) { if (e.code !== 'ENOENT') throw e; }
 function persist(partial) {
   const out = {
     network: 'Stable Studionet', chain_id: CHAIN_ID, contract_address: ADDRESS,
@@ -99,8 +107,13 @@ async function write(role, fn, fnArgs, value = 0n) {
 }
 async function expectOk(role, fn, fnArgs, label, value = 0n) {
   if (done.has(label)) { console.log('SKIP (resume)', label); return null; }
-  const hash = await write(role, fn, fnArgs, value);
+  const pending = cp.pending || {};
+  const hash = pending[label] || await write(role, fn, fnArgs, value);
+  cp.pending = {...pending, [label]: hash};
+  fs.writeFileSync(CHECKPOINT, JSON.stringify(cp, null, 2), {mode: 0o600});
   const tx = await collect(clients[role], hash, label);
+  delete cp.pending[label];
+  fs.writeFileSync(CHECKPOINT, JSON.stringify(cp, null, 2), {mode: 0o600});
   const ok = [7, 'FINALIZED'].includes(tx.status) && [6, 'MAJORITY_AGREE'].includes(tx.result)
     && leaderExec(tx)?.execution_result === 'SUCCESS';
   record({label, hash, outcome: ok ? 'ok' : 'UNEXPECTED', status: tx.status, result: tx.result, leader: leaderExec(tx)?.execution_result});
@@ -109,10 +122,15 @@ async function expectOk(role, fn, fnArgs, label, value = 0n) {
 }
 async function expectError(role, fn, fnArgs, label, needle, value = 0n) {
   if (done.has(label)) { console.log('SKIP (resume)', label); return null; }
-  const hash = await write(role, fn, fnArgs, value);
+  const pending = cp.pending || {};
+  const hash = pending[label] || await write(role, fn, fnArgs, value);
+  cp.pending = {...pending, [label]: hash};
+  fs.writeFileSync(CHECKPOINT, JSON.stringify(cp, null, 2), {mode: 0o600});
   const tx = await collect(clients[role], hash, label);
+  delete cp.pending[label];
+  fs.writeFileSync(CHECKPOINT, JSON.stringify(cp, null, 2), {mode: 0o600});
   const payload = leaderPayload(tx);
-  const ok = [7, 'FINALIZED'].includes(tx.status) && leaderExec(tx)?.execution_result === 'ERROR'
+  const ok = [7, 'FINALIZED'].includes(tx.status) && [6, 'MAJORITY_AGREE'].includes(tx.result) && leaderExec(tx)?.execution_result === 'ERROR'
     && (!needle || payload.includes(needle));
   record({label, hash, outcome: ok ? 'error-observed' : 'UNEXPECTED', status: tx.status, result: tx.result, leader: leaderExec(tx)?.execution_result, payload: payload.slice(0, 200)});
   if (!ok) throw new Error('Expected on-chain ERROR but got: ' + label + ' ' + hash + ' payload=' + payload.slice(0, 200));
@@ -141,7 +159,12 @@ async function judge(role, fn, caseId, expectedVerdict, label) {
     return c;
   }
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const hash = await write(role, fn, [caseId]);
+    const attemptLabel = `${label} (attempt ${attempt})`;
+    if (steps.some(s => s.label === attemptLabel)) continue;
+    cp.pending ||= {};
+    const hash = cp.pending[attemptLabel] || await write(role, fn, [caseId]);
+    cp.pending[attemptLabel] = hash;
+    fs.writeFileSync(CHECKPOINT, JSON.stringify(cp, null, 2), {mode: 0o600});
     const tx = await collect(clients[role], hash, `${label} (attempt ${attempt})`);
     if ([6, 'MAJORITY_AGREE'].includes(tx.result) && leaderExec(tx)?.execution_result === 'SUCCESS') {
       record({label, hash, outcome: 'ok', status: tx.status, result: tx.result, leader: 'SUCCESS', attempt});
@@ -209,6 +232,15 @@ await expectOk('C2', 'create_case', [SRC1, 'Spanish', 'Museum notice, silent cli
 await expectError('OUT', 'submit_translation', [5, TR1], 'neg8 non-designated-submit', 'NOT_DESIGNATED_TRANSLATOR');
 await expectOk('T3', 'submit_translation', [5, TR1], 'case5 submit good Spanish');
 await expectError('C2', 'cancel_case', [5], 'neg9 cancel-after-submit', 'CASE_NOT_OPEN');
+const review = await readCase(5);
+if (!done.has('neg10 early-escalation')) {
+  if (!cp.pending?.['neg10 early-escalation'] && Date.now() / 1000 >= review.review_deadline) throw new Error('Early-escalation evidence window missed; inspect without changing expectations');
+  await expectError('T3', 'escalate_to_dispute', [5], 'neg10 early-escalation', 'CLIENT_REVIEW_PERIOD_ACTIVE');
+  if (JSON.stringify(await readCase(5)) !== JSON.stringify(review)) throw new Error('EARLY_ESCALATION_CHANGED_STATE');
+}
+if (!done.has('case5 escalate to dispute') && Date.now() / 1000 < review.review_deadline) {
+  throw new Error('CLIENT_REVIEW_PERIOD_ACTIVE: resume at ' + new Date(review.review_deadline * 1000).toISOString() + '; no automatic long wait');
+}
 await judge('T3', 'escalate_to_dispute', 5, 'ACCEPT', 'case5 escalate to dispute');
 await expectOk('T3', 'withdraw', [5], 'case5 translator withdraw 10 GEN');
 
@@ -218,17 +250,28 @@ await expectOk('T1', 'submit_translation', [6, TR6], 'case6 submit injection tra
 await judge('C3', 'dispute_case', 6, 'REJECT', 'case6 dispute (injection)');
 await expectOk('C3', 'withdraw', [6], 'case6 client withdraw 10 GEN');
 
+// ---- Brief-only pair: identical text, different feasible terminology brief ----
+await expectOk('C1', 'create_case', [SRC1, 'Spanish', 'Use natural Spanish.', accounts.T1.address], 'case7 create', FEE);
+await expectOk('T1', 'submit_translation', [7, TR1], 'case7 submit');
+await judge('C1', 'dispute_case', 7, 'ACCEPT', 'case7 brief satisfied');
+await expectOk('T1', 'withdraw', [7], 'case7 translator withdraw', 0n);
+await expectOk('C1', 'create_case', [SRC1, 'Spanish', 'Use the exact term "boleto" for admission.', accounts.T1.address], 'case8 create', FEE);
+await expectOk('T1', 'submit_translation', [8, TR1], 'case8 submit same translation');
+await judge('C1', 'dispute_case', 8, 'PARTIAL', 'case8 brief violated');
+await expectOk('T1', 'withdraw', [8], 'case8 translator withdraw', 0n);
+await expectOk('C1', 'withdraw', [8], 'case8 client withdraw', 0n);
+
 // ---- Final readback: latest-final ----
 await sleep(3000);
 const totals = JSON.parse(await reader.readContract({address: ADDRESS, functionName: 'get_totals', args: [], transactionHashVariant: 'latest-final'}));
 const all = JSON.parse(await reader.readContract({address: ADDRESS, functionName: 'get_all_cases', args: [], transactionHashVariant: 'latest-final'}));
 console.log('TOTALS', JSON.stringify(totals));
 console.log('CASES', JSON.stringify(all.map((c) => ({id: c.case_id, status: c.status, verdict: c.verdict, t_credit: c.translator_credit, c_credit: c.client_credit}))));
-const accountingOk = totals.total_received_wei === 60000000000000000000
-  && totals.total_withdrawn_wei === 60000000000000000000
+const accountingOk = totals.total_received_wei === 80000000000000000000
+  && totals.total_withdrawn_wei === 80000000000000000000
   && totals.contract_balance_wei === 0
   && totals.escrowed_wei === 0;
-console.log('ACCOUNTING 60 GEN in = 60 GEN out, escrow 0:', accountingOk);
+console.log('ACCOUNTING 80 GEN in = 80 GEN out, escrow 0:', accountingOk);
 if (!accountingOk) throw new Error('GEN accounting mismatch: ' + JSON.stringify(totals));
 
 const out = {
@@ -242,6 +285,8 @@ const out = {
     {case_id: 4, expected: 'CANCELLED', actual: all[3]?.status, status: all[3]?.status},
     {case_id: 5, expected: 'ACCEPT', actual: all[4]?.verdict, status: all[4]?.status},
     {case_id: 6, expected: 'REJECT', actual: all[5]?.verdict, status: all[5]?.status},
+    {case_id: 7, expected: 'ACCEPT', actual: all[6]?.verdict, status: all[6]?.status},
+    {case_id: 8, expected: 'PARTIAL', actual: all[7]?.verdict, status: all[7]?.status},
   ],
   accounting_ok: accountingOk,
 };

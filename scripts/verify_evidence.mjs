@@ -1,4 +1,4 @@
-// One-command independent verification for LinguaCourt v2.
+// One-command independent verification for LinguaCourt v3.
 // Re-reads everything live from Studionet and compares against
 // evidence/transactions.json and EXPECTED.md. No wallet, no
 // transactions, no writes.
@@ -15,13 +15,16 @@ import {createClient} from 'genlayer-js';
 import {studionet} from 'genlayer-js/chains';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const EVIDENCE = path.join(REPO, 'evidence');
-const source = fs.readFileSync(path.join(REPO, 'contracts', 'linguacourt.py'), 'utf8');
+const historical = process.argv.includes('--historical-v2');
+const EVIDENCE = path.join(REPO, 'evidence', historical ? 'v2' : 'v3');
+const source = fs.readFileSync(historical ? path.join(EVIDENCE, 'linguacourt.py') : path.join(REPO, 'contracts', 'linguacourt.py'), 'utf8');
 const deployment = JSON.parse(fs.readFileSync(path.join(EVIDENCE, 'deployment.json'), 'utf8'));
+if (!deployment.contract_address) throw new Error('V3_NOT_DEPLOYED: no v3 chain evidence exists yet');
 const ev = JSON.parse(fs.readFileSync(path.join(EVIDENCE, 'transactions.json'), 'utf8'));
 if (ev.partial) throw new Error('evidence/transactions.json is PARTIAL — the evidence run did not finish; re-run node scripts/run_evidence.mjs');
 const reader = createClient({chain: studionet});
 const ADDRESS = deployment.contract_address;
+if (!ADDRESS || (!historical && deployment.protocol !== 'linguacourt-3')) throw new Error('V3_NOT_DEPLOYED: historical v2 evidence cannot validate v3');
 let pass = 0, fail = 0;
 const check = (name, ok, detail = '') => {
   console.log((ok ? 'PASS' : 'FAIL') + ' ' + name + (detail ? ' — ' + detail : ''));
@@ -59,7 +62,7 @@ check('deployed code == repo source (byte parity)', code === source, 'source sha
 }
 
 const protocol = await reader.readContract({address: ADDRESS, functionName: 'get_protocol', args: [], transactionHashVariant: 'latest-final'});
-check('protocol is linguacourt-2', protocol === 'linguacourt-2', String(protocol));
+check('protocol matches evidence version', protocol === (historical ? 'linguacourt-2' : 'linguacourt-3'), String(protocol));
 
 for (const s of ev.steps) {
   if (!s.hash) { check(s.label + ' has a tx hash', false); continue; }
@@ -94,8 +97,9 @@ const totals = JSON.parse(await reader.readContract({address: ADDRESS, functionN
 // add cases, so the aggregate check is: received == 60 GEN + 10 GEN per
 // extra case, withdrawn == received, balance 0, escrow 0.
 const all = JSON.parse(await reader.readContract({address: ADDRESS, functionName: 'get_all_cases', args: [], transactionHashVariant: 'latest-final'}));
-const extraCases = all.length - 6;
-const expectedReceived = 60000000000000000000 + 10000000000000000000 * extraCases;
+const expectedCount = historical ? 6 : 8;
+const extraCases = all.length - expectedCount;
+const expectedReceived = 10000000000000000000 * (expectedCount + extraCases);
 check(`GEN accounting closes: ${expectedReceived / 1e18} GEN in = out, balance 0, escrow 0 (${extraCases} post-evidence case(s))`,
   totals.total_received_wei === expectedReceived
   && totals.total_withdrawn_wei === totals.total_received_wei
@@ -109,6 +113,17 @@ const expect = {
   5: ['SETTLED_ACCEPT', 'ACCEPT', 10000000000000000000, 0],
   6: ['SETTLED_REJECT', 'REJECT', 0, 10000000000000000000],
 };
+if (!historical) {
+  expect[7] = ['SETTLED_ACCEPT', 'ACCEPT', 10000000000000000000, 0];
+  expect[8] = ['SETTLED_PARTIAL', 'PARTIAL', 5000000000000000000, 5000000000000000000];
+  check('all eight evidence cases exist', Object.keys(expect).every(id => all.some(c => c.case_id === Number(id))));
+  check('early escalation negative recorded', ev.steps.some(s => s.label === 'neg10 early-escalation' && s.outcome === 'error-observed'));
+  for (const c of all.filter(c => c.case_id <= 8 && c.translation)) {
+    check('case ' + c.case_id + ' review deadline is 24h after submission', c.review_deadline === c.submitted_at + 86400 && c.review_period_seconds === 86400);
+  }
+  const c7 = all.find(c => c.case_id === 7), c8 = all.find(c => c.case_id === 8);
+  check('brief-only pair retains identical source and translation', !!c7 && !!c8 && c7.source_text === c8.source_text && c7.translation === c8.translation && c7.brief !== c8.brief);
+}
 for (const c of all) {
   const e = expect[c.case_id];
   if (!e) {

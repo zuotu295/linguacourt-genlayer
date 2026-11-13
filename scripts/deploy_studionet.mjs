@@ -21,7 +21,7 @@ const opt = (name, def) => {
 };
 const CHECKPOINT = opt('--checkpoint', path.resolve(REPO, '..', '.linguacourt-checkpoint.json'));
 const CONTRACT_PATH = path.join(REPO, 'contracts', 'linguacourt.py');
-const DEPLOYMENT_PATH = path.join(REPO, 'evidence', 'deployment.json');
+const DEPLOYMENT_PATH = path.join(REPO, 'evidence', 'v3', 'deployment.json');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sha = (s) => createHash('sha256').update(s).digest('hex');
@@ -62,7 +62,28 @@ async function collect(client, hash, label) {
 const source = fs.readFileSync(CONTRACT_PATH, 'utf8');
 console.log('contract source sha256:', sha(source), `(${Buffer.byteLength(source)} bytes)`);
 
+const plan = {
+  protocol: 'linguacourt-3', status: 'awaiting_deployment',
+  network: 'Stable Studionet', chain_id: CHAIN_ID, rpc: RPC_URL,
+  source_file: 'contracts/linguacourt.py', source_sha256: sha(source),
+  source_bytes: Buffer.byteLength(source), review_period_seconds: 86400,
+  contract_address: null, deploy_tx: null,
+};
+if (!args.includes('--send')) {
+  const reader = createClient({chain: studionet});
+  const chainId = await reader.getChainId();
+  if (chainId !== CHAIN_ID) throw new Error('WRONG_CHAIN: ' + chainId);
+  console.log(JSON.stringify({...plan, rpc_chain_verified: chainId}, null, 2));
+  console.log('READ_ONLY_PREFLIGHT: no accounts, funding, signatures or transactions.');
+  process.exit(0);
+}
+if (!args.includes('--checkpoint')) throw new Error('Explicit fresh --checkpoint required for v3');
+if (fs.existsSync(CHECKPOINT)) {
+  const existing = JSON.parse(fs.readFileSync(CHECKPOINT, 'utf8'));
+  if (existing.source_sha256 !== sha(source)) throw new Error('CHECKPOINT_SOURCE_MISMATCH');
+}
 const cp = loadCheckpoint();
+cp.source_sha256 = sha(source);
 for (const k of ['C1', 'C2', 'C3', 'T1', 'T2', 'T3', 'OUT']) {
   if (!cp.wallets[k]) { cp.wallets[k] = generatePrivateKey(); console.log('generated temp account', k); }
 }
@@ -91,13 +112,17 @@ for (const k of Object.keys(accounts)) {
 
 let address = cp.contract_address || null;
 let deployTx = cp.deploy_tx || null;
-if (address && deployTx) {
+if (deployTx) {
   console.log('resuming existing deploy', address, deployTx);
   const tx = await collect(deployer, deployTx, 'deploy (resume)');
   if (!good(tx)) throw new Error('recorded deploy tx is not good; inspect before redeploying');
+  address = tx.data?.contract_address || tx.contract_address || address;
+  if (!address) throw new Error('no contract address in resumed receipt');
+  cp.contract_address = address; saveCheckpoint(cp);
 } else {
   await sleep(3000);
   const hash = await deployer.deployContract({code: source, args: [], value: 0n, leaderOnly: false});
+  cp.deploy_tx = hash; saveCheckpoint(cp);
   const tx = await collect(deployer, hash, 'deploy');
   if (!good(tx)) throw new Error('deploy failed: ' + JSON.stringify(tx));
   address = tx.data?.contract_address || tx.contract_address;
@@ -115,6 +140,7 @@ console.log('BYTE_PARITY_MATCH: TRUE');
 
 fs.mkdirSync(path.dirname(DEPLOYMENT_PATH), {recursive: true});
 const deployment = {
+  protocol: 'linguacourt-3', status: 'deployed', review_period_seconds: 86400,
   network: 'Stable Studionet',
   chain_id: CHAIN_ID,
   rpc: RPC_URL,

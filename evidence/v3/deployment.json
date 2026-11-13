@@ -1,0 +1,13 @@
+{
+  "protocol": "linguacourt-3",
+  "status": "awaiting_deployment",
+  "network": "Stable Studionet",
+  "chain_id": 61999,
+  "rpc": "https://studio.genlayer.com/api",
+  "source_file": "contracts/linguacourt.py",
+  "source_sha256": "0a201dd7ab87b1fc5bf342083d3255873b1acb8a0b8f5d8578a8bf537a197feb",
+  "source_bytes": 16007,
+  "review_period_seconds": 86400,
+  "contract_address": null,
+  "deploy_tx": null
+}

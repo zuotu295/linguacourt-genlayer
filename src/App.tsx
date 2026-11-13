@@ -34,6 +34,12 @@ export default function App() {
   const [keyCopied, setKeyCopied] = useState(false);
   const [keyRevealed, setKeyRevealed] = useState(false);
 
+  const [nowSeconds, setNowSeconds] = useState(Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowSeconds(Math.floor(Date.now() / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const [src, setSrc] = useState('');
   const [target, setTarget] = useState('Spanish');
   const [brief, setBrief] = useState('');
@@ -288,7 +294,7 @@ export default function App() {
   function exportDossier(c: CaseRec) {
     if (!readback.done) return;
     const dossier = {
-      product: 'LinguaCourt', protocol: 'linguacourt-2', network: 'Stable Studionet', chain_id: CHAIN_ID,
+      product: 'LinguaCourt', protocol: 'linguacourt-3', network: 'Stable Studionet', chain_id: CHAIN_ID,
       contract_address: contractAddress(), explorer: explorerAddress(contractAddress()),
       signer_mode: wallet?.signer_mode || 'READ_ONLY', readback_finalized_at: readback.at, case: c, totals,
     };
@@ -471,6 +477,7 @@ export default function App() {
                 <dl>
                   <dt>Source / 原文</dt><dd>{sel.source_text}</dd>
                   <dt>Brief / 简述</dt><dd>{sel.brief || '—'}</dd>
+                  {sel.review_deadline > 0 && <><dt>Client review deadline / 客户审阅截止</dt><dd>{new Date(sel.review_deadline * 1000).toISOString()} · 24h from submission transaction / 从提交交易起算 24 小时</dd></>}
                   <dt>{t('client', lang)}</dt><dd className="mono">{sel.client}</dd>
                   <dt>{t('translator', lang)}</dt><dd className="mono">{sel.translator || '—'}</dd>
                   <dt>{t('translationLabel', lang)}</dt><dd>{sel.translation || '—'}</dd>
@@ -498,7 +505,8 @@ export default function App() {
                 )}
                 {sel.status === 'SUBMITTED' && isTranslator(sel) && (
                   <div className="actions">
-                    <button className="btn danger" onClick={() => doWrite(t('escalate', lang), 'escalate_to_dispute', [sel.case_id], 0n, `Case #${sel.case_id} · verdict by validators`)} disabled={!!busy}>{t('escalate', lang)}</button>
+                    <button className="btn danger" onClick={() => doWrite(t('escalate', lang), 'escalate_to_dispute', [sel.case_id], 0n, `Case #${sel.case_id} · verdict by validators`)} disabled={!!busy || !sel.review_deadline || nowSeconds < sel.review_deadline}>{t('escalate', lang)}</button>
+                    <p className="hint">{nowSeconds < sel.review_deadline ? 'Client review period active / 客户审阅期内' : 'Contract transaction time determines eligibility / 最终以合约交易时间为准'}</p>
                   </div>
                 )}
                 {sel.status === 'SUBMITTED' && me && !canAct(sel) && !isTranslator(sel) && <p className="hint">Only the case client can accept or dispute. / 只有案件客户可以接受或提交争议。</p>}
@@ -527,7 +535,7 @@ export default function App() {
 
       <footer className="site">
         <div className="wrap">
-          <p><b>LinguaCourt 译审庭</b> · GenLayer Stable Studionet (Chain ID 61999) · Intelligent Contract · linguacourt-2</p>
+          <p><b>LinguaCourt 译审庭</b> · GenLayer Stable Studionet (Chain ID 61999) · Intelligent Contract · linguacourt-3</p>
           <p className="mono">Contract: {dep ? dep.contract_address : 'awaiting deployment.json — UNCONFIRMED'}{dep && <> · <a href={explorerAddress(dep.contract_address)} target="_blank" rel="noreferrer">explorer-studio.genlayer.com</a></>}</p>
           <p className="mono small">Source SHA-256: {dep ? dep.source_sha256 : '—'} · Fee: 10 GEN fixed · {t('verdictExpl', lang)}</p>
         </div>
