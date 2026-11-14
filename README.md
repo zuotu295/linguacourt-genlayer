@@ -2,7 +2,7 @@
 
 **Live site: https://zuotu295.github.io/linguacourt-genlayer/**
 
-A translation-quality escrow court on GenLayer Stable Studionet (Chain ID 61999). A client posts a source text + target language, names a **designated translator**, and escrows a fixed **10 GEN** fee. Only the designated translator may submit a translation. The client accepts (fee released in full) or disputes. On dispute — or when the designated translator escalates a silent client's case — GenLayer validators judge the translation against the source text itself and return one fixed verdict — **ACCEPT / PARTIAL / REJECT** — and deterministic contract code settles the fee:
+A translation-quality escrow court on GenLayer Stable Studionet (Chain ID 61999). A client posts a source text + target language, names a **designated translator**, and escrows a fixed **10 GEN** fee. Only the designated translator may submit a translation. The client accepts (fee released in full) or disputes. On dispute — or when the designated translator escalates a silent client's case — GenLayer validators judge the translation against the source text and stored client brief and return one fixed verdict — **ACCEPT / PARTIAL / REJECT** — and deterministic contract code settles the fee:
 
 | Verdict | Translator | Client |
 | --- | --- | --- |
@@ -12,11 +12,15 @@ A translation-quality escrow court on GenLayer Stable Studionet (Chain ID 61999)
 
 Withdraw is pull-payment, once per entitled party per case. Sender-bound roles: only the case client can accept, dispute or cancel; only the designated translator can submit or escalate; one translation per case; dispute/escalation only after submission; accept only before dispute. A verbatim copy of the source is rejected deterministically, without any LLM call.
 
-## Escrow exits (explicit actions only — Studionet has no clock)
+**Release status:** v3 is deployed on Stable Studionet; all 44 live evidence calls are finalized, including escalation after the real 24-hour deadline and final withdrawal. See [chain verification](evidence/v3/LIVE_VALIDATION.md).
+The live site uses v3. Root `evidence/deployment.json` / `transactions.json` are historical v2.
+They are retained unchanged and are not evidence of the v3 fixes.
+
+## Escrow exits and client review period
 
 - **Cancel while OPEN:** the client cancels and the full 10 GEN is credited back to the client for withdraw. Cancel while SUBMITTED is forbidden (the client has already seen the translation; cancel-after-submit would let them take the work and the refund).
-- **Escalate while SUBMITTED:** if the client stays silent, the designated translator escalates to dispute; validators run the *same* judgment as a client dispute, and the triggering translator cannot influence the verdict. The client keeps accept/dispute rights until the case settles.
-- There are no time gates, block-time checks, or timestamps anywhere in the contract: every transition is an explicit action.
+- **Escalate while SUBMITTED:** after the fixed 24-hour review period, if the client stays silent, the designated translator escalates to dispute; validators run the *same* judgment as a client dispute, and the triggering translator cannot influence the verdict. The client keeps accept/dispute rights until the case settles.
+- Submission stores `submitted_at` and immutable `review_deadline = submitted_at + 86400` from `gl.message_raw["datetime"]`. Escalation before the deadline fails with `CLIENT_REVIEW_PERIOD_ACTIVE`; at the deadline it is allowed. Missing/invalid transaction time fails closed. Clients can accept/dispute throughout and after review. The transaction timestamp is deterministic across validators; no caller-supplied timestamp or frontend clock authorizes a transition. The window starts at submission transaction time, not finalization time.
 
 ## Why GenLayer is indispensable here
 
@@ -24,12 +28,20 @@ Translation quality is an ambiguous semantic judgment: no single honest server c
 
 ## Contract
 
-- `contracts/linguacourt.py` — `LinguaCourt`, protocol `linguacourt-2` (v1, `linguacourt-1`, is archived under `evidence/v1/`)
+The stored brief supplies terminology, register, audience, formatting and required
+wording. Both leader and validators receive it through the same `_judge_prompt`.
+Material brief violations in usable translations produce PARTIAL; violations that
+make the translation unusable produce REJECT. Empty briefs add no requirements.
+Verdict/payment instructions and requirements conflicting with source meaning or
+target language are ignored. Local fixtures verify this plumbing, not model security.
+
+
+- `contracts/linguacourt.py` — `LinguaCourt`, protocol `linguacourt-3`; historical v1/v2 evidence is preserved under `evidence/v1/` and `evidence/v2/`
 - Fixed escrow: 10 GEN (`10000000000000000000` wei), `create_case` is `@gl.public.write.payable` and takes the designated translator address (validated `0x` 42-char hex, must differ from the client)
 - `submit_translation` (designated translator only), `cancel_case` (client, OPEN only), `accept_case` (deterministic), `dispute_case` (consensus), `escalate_to_dispute` (designated translator, consensus), `withdraw` (pull-payment)
-- Narrow LLM: validators answer exactly one fixed-enumeration question (`verdict` + one short `reason`); equivalence is exact agreement on the verdict; the reason must pass a deterministic, negation-aware direction check. The judgment prompt marks all INPUT as untrusted data and instructs validators to ignore any instruction embedded in it (see the injection evidence case). The evidence is the on-chain text itself — no external URL fetch, no dead-link failure mode.
+- Narrow LLM: validators answer exactly one fixed-enumeration question (`verdict` + one short `reason`); equivalence is exact agreement on the verdict; the reason must pass a deterministic, negation-aware direction check. The judgment prompt marks all INPUT as untrusted data and instructs validators to ignore any instruction embedded in it (see historical v2 injection evidence and v3 local fixtures). The evidence is the on-chain text itself — no external URL fetch, no dead-link failure mode.
 - Views: `get_case`, `get_all_cases`, `get_totals`, `get_protocol`
-- Deployment facts: `evidence/deployment.json` (address, deploy tx, source SHA-256, byte parity). Pre-registered expectations: `EXPECTED.md`.
+- Current deployment descriptor: `evidence/v3/deployment.json`. Historical deployment facts: `evidence/v2/deployment.json`. Live test expectations: `EXPECTED.md`.
 
 ## Frontend
 
@@ -44,27 +56,45 @@ Vite + React + TypeScript (`src/`), styled as an editorial proofreader's desk �
 ## Run locally
 
 ```bash
-npm install
+npm ci
+python3 -m pip install -r requirements-dev.txt
 npm run build
 npm run preview
 ```
 
-## Deploy & verify (Stable Studionet only)
+## Tests and deployment (Stable Studionet only)
 
 ```bash
-npm test            # contract mock tests (20 cases)
-node scripts/deploy_studionet.mjs    # deploy + byte-parity check
-node scripts/run_evidence.mjs        # full evidence run (6 cases + 10 on-chain negatives neg0–neg9; resumable)
-node scripts/verify_evidence.mjs     # independent re-verification, read-only
+npm test                   # 29 local contract tests; mocked LLM/VM, not live consensus
+npm run test:rpc           # 4 broadcast journal tests; no network access
+npm run typecheck          # TypeScript SDK and UI checks
+node scripts/verify_evidence.mjs --review-checkpoint  # partial review-stage verification; not full acceptance
+npm run build              # Vite production build
+npm run preflight          # offline source/manifest/script consistency; no signer
+node scripts/verify_evidence.mjs --historical-v2  # read-only historical v2 verification
+node scripts/verify_evidence.mjs                  # fails until v3 deployment/evidence exists
 ```
 
-Evidence transactions: `evidence/transactions.json` (see `EVIDENCE.md`).
+The v3 deployment descriptor is `evidence/v3/deployment.json`; it records a fresh
+FINALIZED deployment with byte-for-byte source parity. `public/deployment.json`
+uses the same descriptor: the v3 UI refuses historical v2 addresses. The existing
+Pages site is built from this v3 release.
+Deployment and source parity are verified. Post-deadline escalation returned ACCEPT and the final withdrawal succeeded; 80 GEN received equals 80 GEN withdrawn, with zero balance and escrow. See [final verification](evidence/v3/final-verification.txt). See [local validation](evidence/v3/LOCAL_VALIDATION.md)
+and [live test expectations](EXPECTED.md).
+
+After deployment, record FINALIZED + MAJORITY_AGREE + leader SUCCESS, verify exact
+source bytes, then use the v3 evidence runner with an explicit checkpoint. It
+records an early-escalation failure and stops until the real 24-hour deadline;
+resume the same run afterward. The brief-only cases use identical source and
+translation with different briefs; expected ACCEPT/PARTIAL must be observed live,
+never substituted with fixture results. The old contract is immutable and its
+receipts cannot validate v3. Existing v2 escrows remain on v2.
 
 ## What this project does not prove
 
 - **No independent anchor by design.** The evidence is the on-chain source text and translation themselves — both are party-supplied. There is no external, independently verifiable source (no URL fetch, no third-party record) that the verdict is checked against; validators judge the text in front of them. A client and translator who collude on the text can produce any verdict the text supports.
 - **The accept path pays without consensus, by the buyer's own choice.** When the client accepts, the full fee is released with no validator judgment at all. That is the intended UX (a happy client should not wait for a court), not a verification of quality.
-- **No clock-based timeout.** Studionet has no clock, so a silent client cannot be timed out; the only recovery is the translator's explicit escalation, and a case with no translator action stays SUBMITTED indefinitely.
+- **No automatic settlement.** The translator must explicitly escalate after the 24-hour deadline; inactivity still leaves the case SUBMITTED.
 - **Validator judgment is LLM agreement, not proof.** Validators are independent LLM calls agreeing on one fixed verdict; agreement is not a mathematical proof that the translation is good, and a consensus disagreement leaves the case unsettled (retryable).
 - **Fixed 10 GEN fee; no variable pricing, no revision rounds.** One translation per case; the client cannot request revisions — a new case is needed for a revised translation.
 
@@ -72,7 +102,7 @@ Evidence transactions: `evidence/transactions.json` (see `EVIDENCE.md`).
 
 - Fixed fee of 10 GEN per case; no variable pricing.
 - Dispute verdicts depend on validator LLM agreement; a consensus disagreement leaves the case SUBMITTED and the dispute can be retried (recorded as an attempt in evidence).
-- No time gates: every transition is an explicit action; a case stays OPEN until its designated translator submits, and stays SUBMITTED until the client acts or the translator escalates.
+- Review timing depends on the transaction datetime supplied by GenVM. Compatibility with the pinned runtime on Stable Studionet was verified by v3 live submissions and post-deadline escalation. Timestamp metadata is not a proof of wall-clock delivery or finalization. A late-finalizing submission may leave less than 24 hours after finalization.
 - One translation per case; the client cannot request revisions — a new case is needed for a revised translation.
 - v1 (`linguacourt-1`, contract `0xE3F85C032a4B9eEc2978aEf39885Bf5374291C5D`) is superseded; its evidence is archived under `evidence/v1/` and must not be presented as v2 evidence.
 - Platform behavior (verified live 2026-11-11): on Studionet a FAILED payable call does not refund the sent value — it stays in the contract with no entitlement. The first v2 deployment (`0x634667fEB842d7AA61c6c8cE3cC37b41D6432EBF`) was abandoned after two failed `create_case` calls (1 GEN wrong-fee, 10 GEN translator-is-client) stranded 11 GEN there, and one successfully created case (SUBMITTED, keys lost) holds a further 10 GEN escrow with no exit — 21 GEN permanently locked in total (live readback 2026-11-11: contract balance 21 GEN, escrowed 10 GEN, 1 SUBMITTED case, both credits 0, nothing withdrawn). Evidence never sends value on an expected-failure payable call. The frontend validates every `create_case` / `submit_translation` input against the contract bounds (code-point counts) before any payable send, so an over-long source text can no longer strand the 10 GEN fee.

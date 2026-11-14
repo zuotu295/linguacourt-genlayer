@@ -1,0 +1,43 @@
+{
+  "contract_address": "0xD72656e8DC07fC2Be3849e64568bE5dB4AD2BdF2",
+  "case": {
+    "brief": "Museum notice, silent client",
+    "case_id": 5,
+    "client": "0xc290080a176e56b770b612e834e1104cca92c18f",
+    "client_credit": 0,
+    "client_withdrawn": false,
+    "fee_wei": 10000000000000000000,
+    "reason": "The translation is accurate, natural, and completely faithful to the source text while adhering to the client brief.",
+    "review_deadline": 1794623988,
+    "review_period_seconds": 86400,
+    "source_text": "The museum opens at nine in the morning and closes at six in the evening. Admission is free on Sundays.",
+    "status": "SETTLED_ACCEPT",
+    "submitted_at": 1794537588,
+    "target_lang": "Spanish",
+    "translation": "El museo abre a las nueve de la mañana y cierra a las seis de la tarde. La entrada es gratuita los domingos.",
+    "translator": "0xcbade4ee85cb5d0d03419d70fb1330194baf10f0",
+    "translator_credit": 10000000000000000000,
+    "translator_withdrawn": true,
+    "verdict": "ACCEPT"
+  },
+  "readback_at": "2026-11-14T06:12:36.726Z",
+  "early_escalation": {
+    "label": "neg10 early-escalation",
+    "hash": "0x2a148c1e7562aca29d0995bb52530e2f06d9e02a10d1283215cb29ee3709c7ea",
+    "outcome": "error-observed",
+    "status": 7,
+    "result": 6,
+    "leader": "ERROR",
+    "payload": "CLIENT_REVIEW_PERIOD_ACTIVE"
+  },
+  "post_deadline_escalation": true,
+  "finalized_escalation": {
+    "label": "case5 escalate to dispute",
+    "hash": "0xa2791cc2483b7eb3f8c3569078570e779b1744e42d0e874dca57f3cb9d3558f5",
+    "outcome": "ok",
+    "status": 7,
+    "result": 6,
+    "leader": "SUCCESS",
+    "attempt": 1
+  }
+}

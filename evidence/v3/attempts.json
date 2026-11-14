@@ -1,0 +1,29 @@
+[
+  {
+    "observed_at": "2026-11-13T02:23:19.953134+00:00",
+    "stage": "case2 create before transaction broadcast",
+    "error": "eth_gasPrice returned HTML instead of JSON; viem UnknownRpcError",
+    "state_check": "latest-final case_count=1; case1 SETTLED_ACCEPT; balance=0; escrow=0; checkpoint pending empty",
+    "action": "Resume recorded steps; no case2 creation observed"
+  },
+  {
+    "observed_at": "2026-11-13T02:28:31.775855+00:00",
+    "stage": "case2 submit",
+    "error": "eth_sendRawTransaction returned HTML instead of JSON; response was ambiguous",
+    "reconciliation": {
+      "sender": "0xC743ed7c85f178B2e8C9c4Eb2D2a742186fBE8ce",
+      "sender_history": "only the initial funding transaction; no contract write",
+      "contract_history_latest": "case2 create 0x77e89190cc25e551d2c841b61fc1e871c78c78969416522361d426cc06bc4aad; no case2 submit",
+      "latest_final_case2_status": "OPEN",
+      "read_only_method": "sim_getTransactionsForAddress"
+    },
+    "action": "No accepted submission found; resume from case2 submit. Future raw submissions are journaled before HTTP and ambiguous responses block automatic retry."
+  },
+  {
+    "observed_at": "2026-11-13T02:47:01.790228+00:00",
+    "stage": "case7 create receipt polling",
+    "error": "eth_getTransactionByHash returned HTML instead of JSON",
+    "hash": "0x646bab1d2bbff1171113aec06727d814875bd602a454ee268fcd2f693b3c88bc",
+    "action": "Read-only polling resumed the same hash; transaction observed FINALIZED + MAJORITY_AGREE + leader SUCCESS. No resend."
+  }
+]

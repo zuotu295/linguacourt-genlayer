@@ -2,7 +2,7 @@ export type Lang = 'zh' | 'en';
 export const STR: Record<string, Record<Lang, string>> = {
   tagline: { zh: '翻译质量托管法庭 · 译文对错，由共识裁决', en: 'Translation-quality escrow court · consensus judges the translation' },
   heroTitle: { zh: '译文好不好，\n不该由一个人说了算。', en: 'Whether a translation\nis good should not be\none person’s call.' },
-  heroSub: { zh: '客户托管 10 GEN 发布译单，译者提交译文。接受，全额付款；有争议，GenLayer 验证者对照原文裁决 ACCEPT / PARTIAL / REJECT，合约代码按裁决分钱——不多一分，不少一分。', en: 'A client escrows 10 GEN and posts a job; a translator submits. Accept and the fee is released in full. Dispute, and GenLayer validators judge the translation against the source — ACCEPT / PARTIAL / REJECT — and deterministic code splits the fee. Not a wei more, not a wei less.' },
+  heroSub: { zh: '客户托管 10 GEN 发布译单，译者提交译文。接受，全额付款；有争议，GenLayer 验证者对照原文及客户要求裁决 ACCEPT / PARTIAL / REJECT，合约代码按裁决分钱——不多一分，不少一分。', en: 'A client escrows 10 GEN and posts a job; a translator submits. Accept and the fee is released in full. Dispute, and GenLayer validators judge the translation against the source and stored client brief — ACCEPT / PARTIAL / REJECT — and deterministic code splits the fee. Not a wei more, not a wei less.' },
   howItWorks: { zh: '流程 · 四步', en: 'How it works · four steps' },
   step1: { zh: '客户发单并托管 10 GEN', en: 'Client posts a job, escrows 10 GEN' },
   step2: { zh: '译者提交译文', en: 'Translator submits a translation' },
@@ -14,7 +14,7 @@ export const STR: Record<string, Record<Lang, string>> = {
   targetLabel: { zh: '目标语言', en: 'Target language' },
   briefLabel: { zh: '简述 / 要求（可选）', en: 'Brief / requirements (optional)' },
   briefPh: { zh: '例如：博物馆开放时间告示，语气正式', en: 'e.g. Museum opening-hours notice, formal tone' },
-  feeNote: { zh: '托管费用固定 10 GEN，裁决后按 ACCEPT 100% / PARTIAL 50–50 / REJECT 全额退回分配。', en: 'Fixed escrow of 10 GEN. Settlement: ACCEPT 100% to translator, PARTIAL 50–50, REJECT full refund.' },
+  feeNote: { zh: '托管费用固定 10 GEN，裁决后按 ACCEPT 100% / PARTIAL 50–50 / REJECT 全额退回分配。提交译文后，客户有 24 小时审阅期；译者到期后才能升级争议，客户可随时接受或提出争议。', en: 'Fixed escrow of 10 GEN. Settlement: ACCEPT 100% to translator, PARTIAL 50–50, REJECT full refund. The client has 24 hours to review after submission; translator escalation unlocks afterward. The client may accept or dispute at any time.' },
   createBtn: { zh: '发布并托管 10 GEN', en: 'Post case & escrow 10 GEN' },
   docket: { zh: '案件卷宗 · Docket', en: 'Case docket' },
   unconfirmed: { zh: '未确认 — 等待链上 FINALIZED 读回', en: 'UNCONFIRMED — waiting for on-chain FINALIZED readback' },

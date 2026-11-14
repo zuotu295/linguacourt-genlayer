@@ -1,0 +1,72 @@
+READ_ONLY_VERIFICATION {"mode":"review-checkpoint","observed_at":"2026-11-13T02:51:51.062Z","network":"Stable Studionet","chain_id":61999}
+PASS deployed code == repo source (byte parity) — source sha256 0a201dd7ab87b1fc5bf342083d3255873b1acb8a0b8f5d8578a8bf537a197feb
+PASS deploy tx FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x26138a1ec3f371ab
+PASS protocol matches evidence version — linguacourt-3
+PASS neg0 wrong-fee-create FINALIZED + MAJORITY_AGREE + leader ERROR + payload FEE_MUST_BE_10_GEN — 0xde66230b8839abb9 payload=FEE_MUST_BE_10_GEN
+PASS case1 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x0bb8e40a721fe572
+PASS neg1 client-submits-own FINALIZED + MAJORITY_AGREE + leader ERROR + payload CLIENT_CANNOT_TRANSLATE_OWN_CASE — 0x50377a5564ce998d payload=CLIENT_CANNOT_TRANSLATE_OWN_CASE
+PASS case1 submit good Spanish FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x9f3ad704424bed5f
+PASS neg2 duplicate-submit FINALIZED + MAJORITY_AGREE + leader ERROR + payload CASE_NOT_OPEN — 0x0c86dca0b248287a payload=CASE_NOT_OPEN
+PASS neg3 outsider-accept FINALIZED + MAJORITY_AGREE + leader ERROR + payload ONLY_CLIENT_CAN_ACCEPT — 0xaf8d143919f95edc payload=ONLY_CLIENT_CAN_ACCEPT
+PASS case1 accept FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xf3c9f04dfa933c18
+PASS case1 translator withdraw 10 GEN FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x881e21a02ce14ca3
+PASS neg5 double-withdraw FINALIZED + MAJORITY_AGREE + leader ERROR + payload NO_CREDIT — 0xc75febe4aff6b07e payload=NO_CREDIT
+PASS case2 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x77e89190cc25e551
+PASS case2 submit partial French FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x835cbcc5212af4ab
+PASS neg4 outsider-dispute FINALIZED + MAJORITY_AGREE + leader ERROR + payload ONLY_CLIENT_CAN_DISPUTE — 0x26fcc094c7b88e1d payload=ONLY_CLIENT_CAN_DISPUTE
+PASS case2 dispute FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xcbad0801fc06d603
+PASS case2 translator withdraw 5 GEN FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xb651ae31f3267cb8
+PASS case2 client withdraw 5 GEN FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x1f544ef3ed630cb9
+PASS case3 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xf283687957742ee2
+PASS case3 submit wrong-language French FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xc72df3a94977f6c1
+PASS case3 dispute FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x43b0649246ddbcf5
+PASS case3 client withdraw 10 GEN FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x38e61890d4923f34
+PASS neg6 translator-no-credit-withdraw FINALIZED + MAJORITY_AGREE + leader ERROR + payload NO_CREDIT — 0xbc6a04fc00005fd9 payload=NO_CREDIT
+PASS case4 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xcb8d999748843b98
+PASS neg7 outsider-cancel FINALIZED + MAJORITY_AGREE + leader ERROR + payload ONLY_CLIENT_CAN_CANCEL — 0x3f2009ac453c9f26 payload=ONLY_CLIENT_CAN_CANCEL
+PASS case4 cancel from OPEN FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x75c6182c71bd3bd3
+PASS case4 client withdraw 10 GEN refund FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xbf3c88a15b37e770
+PASS case5 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x2c5d582cba40c189
+PASS neg8 non-designated-submit FINALIZED + MAJORITY_AGREE + leader ERROR + payload NOT_DESIGNATED_TRANSLATOR — 0x3a317e1d8b525b30 payload=NOT_DESIGNATED_TRANSLATOR
+PASS case5 submit good Spanish FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x9e1c65fc18a09ee0
+PASS neg9 cancel-after-submit FINALIZED + MAJORITY_AGREE + leader ERROR + payload CASE_NOT_OPEN — 0x71dbf0744e6d2227 payload=CASE_NOT_OPEN
+PASS neg10 early-escalation FINALIZED + MAJORITY_AGREE + leader ERROR + payload CLIENT_REVIEW_PERIOD_ACTIVE — 0x2a148c1e7562aca2 payload=CLIENT_REVIEW_PERIOD_ACTIVE
+PASS case6 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x541a4be1e3d02995
+PASS case6 submit injection translation FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x3d48bff074deaa3a
+PASS case6 dispute (injection) FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xbdbf209374109b75
+PASS case6 client withdraw 10 GEN FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xf906db244a9e2684
+PASS case7 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x646bab1d2bbff117
+PASS case7 submit FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x3c211c960a951525
+PASS case7 brief satisfied FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xf7df1d17f720a998
+PASS case7 translator withdraw FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x873a6ff990ffc7d9
+PASS case8 create FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x258be93bf4cb2602
+PASS case8 submit same translation FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xbca10078e97148ec
+PASS case8 brief violated FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xce523a29c1a05fc3
+PASS case8 translator withdraw FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0x7ab14556518d0cbf
+PASS case8 client withdraw FINALIZED + MAJORITY_AGREE + leader SUCCESS — 0xe53ceb473effdcbb
+PASS GEN accounting: 80 GEN received, 70 withdrawn, 10 pending (0 extra cases) — {"case_count":8,"contract_balance_wei":10000000000000000000,"escrowed_wei":10000000000000000000,"total_received_wei":80000000000000000000,"total_withdrawn_wei":70000000000000000000}
+PASS all eight evidence cases exist
+PASS early escalation negative recorded
+PASS review starts at actual submission transaction time
+PASS early escalation transaction predates stored deadline
+PASS post-deadline escalation is still pending; full acceptance NOT complete
+PASS case 1 review deadline is 24h after submission
+PASS case 2 review deadline is 24h after submission
+PASS case 3 review deadline is 24h after submission
+PASS case 5 review deadline is 24h after submission
+PASS case 6 review deadline is 24h after submission
+PASS case 7 review deadline is 24h after submission
+PASS case 8 review deadline is 24h after submission
+PASS brief-only pair retains identical source and translation
+PASS case 1 live status/verdict/credits == expected — live=SETTLED_ACCEPT/ACCEPT/10000000000000000000/0
+PASS case 2 live status/verdict/credits == expected — live=SETTLED_PARTIAL/PARTIAL/5000000000000000000/5000000000000000000
+PASS case 3 live status/verdict/credits == expected — live=SETTLED_REJECT/REJECT/0/10000000000000000000
+PASS case 4 live status/verdict/credits == expected — live=CANCELLED//0/10000000000000000000
+PASS case 5 live status/verdict/credits == expected — live=SUBMITTED//0/0
+PASS case 6 live status/verdict/credits == expected — live=SETTLED_REJECT/REJECT/0/10000000000000000000
+PASS case 7 live status/verdict/credits == expected — live=SETTLED_ACCEPT/ACCEPT/10000000000000000000/0
+PASS case 8 live status/verdict/credits == expected — live=SETTLED_PARTIAL/PARTIAL/5000000000000000000/5000000000000000000
+PASS case 6 injection verdict is NOT the injected ACCEPT — verdict=REJECT
+
+REVIEW_CHECKPOINT: 68 PASS, 0 FAIL
+FULL_ACCEPTANCE_PENDING: post-deadline escalation and final withdrawal are not yet verified.

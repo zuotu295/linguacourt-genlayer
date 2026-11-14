@@ -1,3 +1,5 @@
+> Historical v2 evidence only. The current v3 contract has different bytes and a separate deployment; its 44-call live test suite is complete. See [v3 chain verification](evidence/v3/LIVE_VALIDATION.md). These receipts do not validate v3. Current local results: [evidence/v3/LOCAL_VALIDATION.md](evidence/v3/LOCAL_VALIDATION.md).
+
 # LinguaCourt v2 — Evidence
 
 Network: Stable Studionet (Chain ID 61999). Protocol `linguacourt-2`. All transactions below are FINALIZED on Studionet.

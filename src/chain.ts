@@ -8,6 +8,7 @@
 // lives in this tab's sessionStorage only, and is shown to the user once
 // with copy/export + an explicit "I saved my key" acknowledgement.
 import { createClient, createAccount, generatePrivateKey } from 'genlayer-js';
+import { TransactionHashVariant, TransactionStatus, type Hash } from 'genlayer-js/types';
 import { studionet } from 'genlayer-js/chains';
 
 export const CHAIN_ID = 61999;
@@ -17,18 +18,23 @@ export const EXPLORER_BASE = 'https://explorer-studio.genlayer.com';
 export const FEE_WEI = 10000000000000000000n; // fixed escrow: 10 GEN
 export const TARGET_LANGS = ['Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Portuguese', 'Italian', 'Korean'];
 
-export interface Deployment { contract_address: string; deploy_tx: string; source_sha256: string; network: string; chain_id: number }
+export interface Deployment { protocol: string; status?: string; contract_address: string; deploy_tx: string; source_sha256: string; network: string; chain_id: number }
 export let DEPLOYMENT: Deployment | null = null;
 export async function loadDeployment(): Promise<Deployment> {
   const res = await fetch('./deployment.json', { cache: 'no-store' });
   if (!res.ok) throw new Error('deployment.json not served (' + res.status + ')');
-  DEPLOYMENT = (await res.json()) as Deployment;
-  if (!/^0x[0-9a-fA-F]{40}$/.test(DEPLOYMENT.contract_address || '')) {
+  const candidate = (await res.json()) as Deployment;
+  if (candidate.status === 'awaiting_deployment') throw new Error('LinguaCourt v3 awaits deployment; historical v2 is not the brief/review-period release. / v3 尚未部署，旧地址不代表本次修复。');
+  if (candidate.chain_id !== CHAIN_ID || candidate.protocol !== 'linguacourt-3') throw new Error('candidate_VERSION_OR_CHAIN_MISMATCH');
+  if (!/^0x[0-9a-fA-F]{40}$/.test(candidate.contract_address || '')) {
     throw new Error('deployment.json has no valid contract_address');
   }
-  return DEPLOYMENT;
+  const protocol = await reader.readContract({ address: candidate.contract_address as `0x${string}`, functionName: 'get_protocol', args: [], transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+  if (protocol !== 'linguacourt-3') throw new Error('LIVE_PROTOCOL_MISMATCH');
+  DEPLOYMENT = candidate;
+  return candidate;
 }
-export const contractAddress = () => DEPLOYMENT!.contract_address;
+export const contractAddress = () => DEPLOYMENT!.contract_address as `0x${string}`;
 export const explorerTx = (h: string) => EXPLORER_BASE + '/tx/' + h;
 export const explorerAddress = (a: string) => EXPLORER_BASE + '/address/' + a;
 
@@ -37,6 +43,7 @@ export const reader = createClient({ chain: studionet });
 export interface CaseRec {
   case_id: number; client: string; translator: string; source_text: string;
   target_lang: string; brief: string; fee_wei: number; translation: string;
+  submitted_at: number; review_deadline: number; review_period_seconds: number;
   status: string; verdict: string; reason: string;
   translator_credit: number; client_credit: number;
   translator_withdrawn: boolean; client_withdrawn: boolean;
@@ -49,18 +56,22 @@ export interface Totals { total_received_wei: number; total_withdrawn_wei: numbe
 // ISO form. It is NOT an on-chain finalization timestamp (Studionet
 // exposes no block timestamp to the UI); the UI labels it as a readback
 // time, never as "finalized at" a chain time.
+function requireJsonString(raw: unknown): string {
+  if (typeof raw !== 'string') throw new Error('CONTRACT_RETURN_NOT_JSON_STRING');
+  return raw;
+}
 export async function readAllCases(): Promise<{ cases: CaseRec[]; is_finalized_readback: boolean; at: string }> {
-  const raw = await reader.readContract({ address: contractAddress(), functionName: 'get_all_cases', args: [], transactionHashVariant: 'latest-final' });
-  const data = JSON.parse(raw) as CaseRec[];
+  const raw = await reader.readContract({ address: contractAddress(), functionName: 'get_all_cases', args: [], transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+  const data = JSON.parse(requireJsonString(raw)) as CaseRec[];
   return { cases: data, is_finalized_readback: typeof raw === 'string' && raw.length > 2 && Array.isArray(data), at: new Date().toISOString() };
 }
 export async function readTotals(): Promise<Totals> {
-  const raw = await reader.readContract({ address: contractAddress(), functionName: 'get_totals', args: [], transactionHashVariant: 'latest-final' });
-  return JSON.parse(raw) as Totals;
+  const raw = await reader.readContract({ address: contractAddress(), functionName: 'get_totals', args: [], transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+  return JSON.parse(requireJsonString(raw)) as Totals;
 }
 export async function readCase(id: number): Promise<CaseRec> {
-  const raw = await reader.readContract({ address: contractAddress(), functionName: 'get_case', args: [id], transactionHashVariant: 'latest-final' });
-  return JSON.parse(raw) as CaseRec;
+  const raw = await reader.readContract({ address: contractAddress(), functionName: 'get_case', args: [id], transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+  return JSON.parse(requireJsonString(raw)) as CaseRec;
 }
 
 // ---- Tx lifecycle: hash saved immediately, timeout is "unknown" ----
@@ -95,8 +106,11 @@ export class TxUnknownError extends Error {
 }
 
 export async function waitFinalized(hash: string) {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw new Error('INVALID_TX_HASH');
   try {
-    return await reader.waitForTransactionReceipt({ hash, status: 'FINALIZED', interval: 3000, retries: 40, fullTransaction: true });
+    // genlayer-js 1.1.8 implements fullTransaction but omits it from its declaration.
+    const request = { hash: hash as Hash, status: TransactionStatus.FINALIZED, interval: 3000, retries: 40, fullTransaction: true };
+    return await reader.waitForTransactionReceipt(request);
   } catch {
     throw new TxUnknownError(hash);
   }
@@ -112,7 +126,7 @@ export function leaderPayload(tx: any) {
   if (!r) return '';
   if (r.result?.payload) return String(r.result.payload);
   if (typeof r.result?.raw === 'string') {
-    try { return Buffer.from(r.result.raw, 'base64').toString(); } catch { return ''; }
+    try { return new TextDecoder().decode(Uint8Array.from(atob(r.result.raw), c => c.charCodeAt(0))); } catch { return ''; }
   }
   return '';
 }
@@ -157,7 +171,7 @@ export async function connectInjected(): Promise<Wallet> {
   const accounts = await provider.request({ method: 'eth_requestAccounts' });
   await switchToStudionet(provider);
   const address = String(accounts[0]).toLowerCase();
-  const client = createClient({ chain: studionet, provider, account: address });
+  const client = createClient({ chain: studionet, provider, account: address as `0x${string}` });
   return { mode: 'injected', address, provider, client, signer_mode: 'INJECTED_WALLET' };
 }
 // Verify the injected wallet is still on Studionet before a write;
@@ -212,6 +226,7 @@ export function destroyTemporaryAccount() {
 // Send only: returns the hash immediately (caller must save it before
 // waiting). Waiting is separate so a timeout never loses the hash.
 export async function sendWriteOnly(wallet: Wallet, functionName: string, args: any[], value = 0n) {
+  if (!DEPLOYMENT || DEPLOYMENT.protocol !== 'linguacourt-3' || DEPLOYMENT.status === 'awaiting_deployment') throw new Error('V3_NOT_DEPLOYED');
   if (!wallet?.client) throw new Error('NO_SIGNER');
   await ensureInjectedChain(wallet);
   const hash = await wallet.client.writeContract({ address: contractAddress(), functionName, args, value, leaderOnly: false });
