@@ -12,8 +12,8 @@ A translation-quality escrow court on GenLayer Stable Studionet (Chain ID 61999)
 
 Withdraw is pull-payment, once per entitled party per case. Sender-bound roles: only the case client can accept, dispute or cancel; only the designated translator can submit or escalate; one translation per case; dispute/escalation only after submission; accept only before dispute. A verbatim copy of the source is rejected deterministically, without any LLM call.
 
-**Release status:** v3 is deployed on Stable Studionet; the live evidence suite is in progress. The post-review escalation proof requires the real 24-hour deadline. See [chain verification](evidence/v3/LIVE_VALIDATION.md).
-The live site and root `evidence/deployment.json` / `transactions.json` are historical v2.
+**Release status:** v3 is deployed on Stable Studionet; all 44 live evidence calls are finalized, including escalation after the real 24-hour deadline and final withdrawal. See [chain verification](evidence/v3/LIVE_VALIDATION.md).
+The live site uses v3. Root `evidence/deployment.json` / `transactions.json` are historical v2.
 They are retained unchanged and are not evidence of the v3 fixes.
 
 ## Escrow exits and client review period
@@ -41,7 +41,7 @@ target language are ignored. Local fixtures verify this plumbing, not model secu
 - `submit_translation` (designated translator only), `cancel_case` (client, OPEN only), `accept_case` (deterministic), `dispute_case` (consensus), `escalate_to_dispute` (designated translator, consensus), `withdraw` (pull-payment)
 - Narrow LLM: validators answer exactly one fixed-enumeration question (`verdict` + one short `reason`); equivalence is exact agreement on the verdict; the reason must pass a deterministic, negation-aware direction check. The judgment prompt marks all INPUT as untrusted data and instructs validators to ignore any instruction embedded in it (see historical v2 injection evidence and v3 local fixtures). The evidence is the on-chain text itself — no external URL fetch, no dead-link failure mode.
 - Views: `get_case`, `get_all_cases`, `get_totals`, `get_protocol`
-- Current deployment descriptor: `evidence/v3/deployment.json` (pending). Historical deployment facts: `evidence/v2/deployment.json`. Live test expectations: `EXPECTED.md`.
+- Current deployment descriptor: `evidence/v3/deployment.json`. Historical deployment facts: `evidence/v2/deployment.json`. Live test expectations: `EXPECTED.md`.
 
 ## Frontend
 
@@ -78,8 +78,8 @@ node scripts/verify_evidence.mjs                  # fails until v3 deployment/ev
 The v3 deployment descriptor is `evidence/v3/deployment.json`; it records a fresh
 FINALIZED deployment with byte-for-byte source parity. `public/deployment.json`
 uses the same descriptor: the v3 UI refuses historical v2 addresses. The existing
-Pages site still runs the historical release until the new build is published.
-Deployment, source parity and the review checkpoint have been independently verified (68 PASS, 0 FAIL). The post-deadline escalation proof is still pending. See [local validation](evidence/v3/LOCAL_VALIDATION.md)
+Pages site is built from this v3 release.
+Deployment and source parity are verified. Post-deadline escalation returned ACCEPT and the final withdrawal succeeded; 80 GEN received equals 80 GEN withdrawn, with zero balance and escrow. See [final verification](evidence/v3/final-verification.txt). See [local validation](evidence/v3/LOCAL_VALIDATION.md)
 and [live test expectations](EXPECTED.md).
 
 After deployment, record FINALIZED + MAJORITY_AGREE + leader SUCCESS, verify exact
@@ -102,7 +102,7 @@ receipts cannot validate v3. Existing v2 escrows remain on v2.
 
 - Fixed fee of 10 GEN per case; no variable pricing.
 - Dispute verdicts depend on validator LLM agreement; a consensus disagreement leaves the case SUBMITTED and the dispute can be retried (recorded as an attempt in evidence).
-- Review timing depends on the transaction datetime supplied by GenVM. Compatibility with the pinned runtime on Stable Studionet still requires v3 live validation. Timestamp metadata is not a proof of wall-clock delivery or finalization. A late-finalizing submission may leave less than 24 hours after finalization.
+- Review timing depends on the transaction datetime supplied by GenVM. Compatibility with the pinned runtime on Stable Studionet was verified by v3 live submissions and post-deadline escalation. Timestamp metadata is not a proof of wall-clock delivery or finalization. A late-finalizing submission may leave less than 24 hours after finalization.
 - One translation per case; the client cannot request revisions — a new case is needed for a revised translation.
 - v1 (`linguacourt-1`, contract `0xE3F85C032a4B9eEc2978aEf39885Bf5374291C5D`) is superseded; its evidence is archived under `evidence/v1/` and must not be presented as v2 evidence.
 - Platform behavior (verified live 2026-11-11): on Studionet a FAILED payable call does not refund the sent value — it stays in the contract with no entitlement. The first v2 deployment (`0x634667fEB842d7AA61c6c8cE3cC37b41D6432EBF`) was abandoned after two failed `create_case` calls (1 GEN wrong-fee, 10 GEN translator-is-client) stranded 11 GEN there, and one successfully created case (SUBMITTED, keys lost) holds a further 10 GEN escrow with no exit — 21 GEN permanently locked in total (live readback 2026-11-11: contract balance 21 GEN, escrowed 10 GEN, 1 SUBMITTED case, both credits 0, nothing withdrawn). Evidence never sends value on an expected-failure payable call. The frontend validates every `create_case` / `submit_translation` input against the contract bounds (code-point counts) before any payable send, so an over-long source text can no longer strand the 10 GEN fee.

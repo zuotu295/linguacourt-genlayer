@@ -35,7 +35,7 @@ The first optional TypeScript check exposed missing original type declarations a
 SDK type mismatches; these were fixed and the final check passed. No failed chain
 records were deleted or reclassified. The initial offline preflight and direct read-only chain-ID request completed; subsequent deployments and live attempts are recorded separately.
 
-## Chain validation still required
+## Original chain validation requirements (now completed)
 
 The pinned runtime must execute the new datetime access successfully. Deploy a new
 address, require FINALIZED + MAJORITY_AGREE + leader SUCCESS and exact source-byte
@@ -45,4 +45,8 @@ complete withdrawal accounting. The 24 hours is measured from submission transac
 time, not from finalization or the browser clock. Validator model quality and prompt
 injection resistance remain empirical, not established by canned unit fixtures.
 
-The root v2 deployment/transactions and historical Pages build remain historical. The initial v3 build used a pending descriptor; after the fresh deployment, `public/deployment.json` was updated to the actual v3 descriptor.
+The root v2 deployment/transactions remain historical; the current Pages build uses v3. The initial v3 build used a pending descriptor; after the fresh deployment, `public/deployment.json` was updated to the actual v3 descriptor.
+
+## Final release checks (2026-11-14)
+
+The refreshed environment initially lacked pytest; the first test command failed before collection. Installing the pinned `requirements-dev.txt` restored the dependency. Subsequent checks: 29 contract tests and 4 RPC journal tests passed; typecheck, 11-check preflight and production build passed. A third-party pytest deprecation warning and Vite large-chunk advisory remain. The v3 production build is synchronized to `docs/`; browser smoke validation remains uncompleted due to the previously recorded Chromium socket restriction.

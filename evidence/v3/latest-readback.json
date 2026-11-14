@@ -5,7 +5,7 @@
   "protocol": "linguacourt-3",
   "source_sha256": "0a201dd7ab87b1fc5bf342083d3255873b1acb8a0b8f5d8578a8bf537a197feb",
   "source_byte_parity": true,
-  "readback_at": "2026-11-13T02:51:57.378Z",
+  "readback_at": "2026-11-14T06:14:24.817Z",
   "read_variant": "latest-final",
   "note": "Independent finalized reads, not an atomic multi-method snapshot; unsettled cases are not passing settlement evidence.",
   "cases": [
@@ -96,18 +96,18 @@
       "client_credit": 0,
       "client_withdrawn": false,
       "fee_wei": 10000000000000000000,
-      "reason": "",
+      "reason": "The translation is accurate, natural, and completely faithful to the source text while adhering to the client brief.",
       "review_deadline": 1794623988,
       "review_period_seconds": 86400,
       "source_text": "The museum opens at nine in the morning and closes at six in the evening. Admission is free on Sundays.",
-      "status": "SUBMITTED",
+      "status": "SETTLED_ACCEPT",
       "submitted_at": 1794537588,
       "target_lang": "Spanish",
       "translation": "El museo abre a las nueve de la mañana y cierra a las seis de la tarde. La entrada es gratuita los domingos.",
       "translator": "0xcbade4ee85cb5d0d03419d70fb1330194baf10f0",
-      "translator_credit": 0,
-      "translator_withdrawn": false,
-      "verdict": ""
+      "translator_credit": 10000000000000000000,
+      "translator_withdrawn": true,
+      "verdict": "ACCEPT"
     },
     {
       "brief": "Library lending rules",
@@ -172,9 +172,9 @@
   ],
   "totals": {
     "case_count": 8,
-    "contract_balance_wei": 10000000000000000000,
-    "escrowed_wei": 10000000000000000000,
+    "contract_balance_wei": 0,
+    "escrowed_wei": 0,
     "total_received_wei": 80000000000000000000,
-    "total_withdrawn_wei": 70000000000000000000
+    "total_withdrawn_wei": 80000000000000000000
   }
 }

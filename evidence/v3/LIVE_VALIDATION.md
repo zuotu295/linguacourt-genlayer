@@ -14,12 +14,10 @@
 ## Review checkpoint
 
 The independent read-only review checkpoint completed with **68 PASS, 0 FAIL**.
-Reproduce using `node scripts/verify_evidence.mjs --review-checkpoint` while case 5
-remains in the review window. Full verification is intentionally blocked by
-`partial: true` until post-deadline escalation and its withdrawal are observed.
+This historical checkpoint precedes the final settlement. Full verification now uses `node scripts/verify_evidence.mjs` without the checkpoint flag.
 See [verification output](review-checkpoint-verification.txt).
 
-42 calls have been observed FINALIZED: 31 successful executions and 11 expected
+44 calls have been observed FINALIZED: 33 successful executions and 11 expected
 contract errors, each with MAJORITY_AGREE. Deployment is recorded separately.
 
 | Case | Observed result | Withdrawals |
@@ -28,7 +26,7 @@ contract errors, each with MAJORITY_AGREE. Deployment is recorded separately.
 | 2 | Validator PARTIAL for wrong ticket price | 5 GEN each |
 | 3 | Validator REJECT for wrong language | Client 10 GEN |
 | 4 | Client cancellation while OPEN | Client 10 GEN |
-| 5 | SUBMITTED; early escalation rejected | Pending review deadline |
+| 5 | Post-deadline escalation ACCEPT; early escalation rejected | Translator 10 GEN |
 | 6 | Injected verdict instruction rejected; REJECT | Client 10 GEN |
 | 7 | General brief satisfied; ACCEPT | Translator 10 GEN |
 | 8 | Same source and translation; required term missing; PARTIAL | 5 GEN each |
@@ -43,23 +41,20 @@ The early escalation receipt is FINALIZED + MAJORITY_AGREE + leader ERROR with
 ([early-escalation.json](early-escalation.json)). The submission receipt's
 `created_at` matches stored `submitted_at` at Unix-second precision.
 
-Latest-final accounting: 80 GEN received, 70 GEN withdrawn, 10 GEN balance and
-10 GEN escrow remaining for case 5. There is no unexplained accounting gap.
+Latest-final accounting: 80 GEN received, 80 GEN withdrawn, zero balance and
+zero escrow. There is no unexplained accounting gap.
 The independent snapshot is [latest-readback.json](latest-readback.json).
 
-## Remaining live proof
+## Completed review-window proof
 
-Case 5's immutable review deadline is Unix **1794623988**:
-**2026-11-14 02:39:48 UTC / 10:39:48 Asia/Shanghai**. Only at or after that time
-may the translator escalate. The expected result is ACCEPT and a final 10 GEN
-translator withdrawal, bringing accounting to 80 GEN in, 80 GEN out, zero balance
-and escrow. No timestamp override or shortened period may replace that proof.
+Case 5's immutable deadline was Unix 1794623988 (2026-11-14 02:39:48 UTC).
+After the real deadline, escalation returned ACCEPT and withdrawal completed.
+Both receipts are FINALIZED + MAJORITY_AGREE + leader SUCCESS:
+- Escalation: `0xa2791cc2483b7eb3f8c3569078570e779b1744e42d0e874dca57f3cb9d3558f5`.
+- Withdrawal: `0xf0e46ce658934818c3ff2e1889a019b51d7f7b8f5000ac11a701df00ab555288`.
 
-After the deadline, resume the same checkpoint and run
-`node scripts/verify_evidence.mjs` without the checkpoint flag. Existing successful
-steps and stored transaction hashes must be reused. `review-window.json` and
-`transactions.json` remain explicitly incomplete until then. No full acceptance
-or Portal resubmission is claimed by the checkpoint result.
+See [full verification](final-verification.txt), [review window](review-window.json)
+and [transactions](transactions.json). No time override or shortened period was used.
 
 ## Tooling and transport observations
 
@@ -72,5 +67,4 @@ or Portal resubmission is claimed by the checkpoint result.
 - Browser smoke verification remains incomplete because the environment blocked
   Chromium socket creation; no browser pass is claimed.
 - The prepared frontend uses the new deployment descriptor and explains the
-  24-hour period before funding. Main-branch Pages still uses historical v2
-  until full verification and release publication.
+  24-hour period before funding. The Pages build is synchronized with this v3 descriptor.
